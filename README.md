@@ -2,6 +2,6 @@
 
 Dashboard app for politics KPIs in the Czech Republic.
 
-**Tech Stack:** React
+**Tech Stack:** Typescript React + Recharts
 **Backend:** CSU public API
 
