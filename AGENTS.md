@@ -6,6 +6,8 @@
 
 **Infrastructure as code:** Infrastructure is defined in `infra/` director and is managed by terraform
 
+**MCPs:** You should have Playwright and Chrome DevTools mcps avaiable in order to check your own work.
+
 ### Český statistický úřad (ČSÚ)
 
 - **Attribution:** name ČSÚ as the data source, without implying that ČSÚ endorses you or your use of the data. 
@@ -20,7 +22,7 @@ csu
 #### Target architecture
 
 - Cache the data in our infra rather than proxying every user request to the ČSÚ API. This protects from outages and keeps a polite API consumer.
-- Prototype can be done with proxy API calls.
+- Prototype will be done with proxy API calls.
 
  ┌──────────┐  cron/daily   ┌─────────────┐      ┌──────────┐
  │ ČSÚ API  │ ───────────▶  │ ETL (Python)│ ───▶ │ DB /     │
@@ -50,6 +52,14 @@ csu
 - Include last valid date information in every chart in the app - current timestamp in case of prototype or cron run timestamp in case of cached data.
 - Include corresponding API url in every chart in the app, so the user can click and see the results in direct link.
 - Include picture of prime ministers above the chart with dashed vertical line marking the periods they were voted in.
+- For the images of prime miniters, use images on cs.wikipedia.org.
+   - For example `Andrej Babis`: use image `https://cs.wikipedia.org/wiki/Andrej_Babi%C5%A1#/media/Soubor:Andrej_Babi%C5%A1_2025_(cropped).jpg` stored on `https://cs.wikipedia.org/wiki/Andrej_Babi%C5%A1`.
+   - For example `Petr Fiala`: use `https://upload.wikimedia.org/wikipedia/commons/0/05/Czechia_PM_Petr_Fiala_2025_portrait.jpg` stored on `https://cs.wikipedia.org/wiki/Petr_Fiala`. If there are no pictures
+   - etc.
+   - Use only main images from CZ wikipedia.
+   - You can extend this list of images in this file with other prime ministers.
+   - If you do not find the prime minister in CZ wikipedia, report to the prompter and do nothing.
+- Follow the [Color pallete](#color-pallete).
 
                     (BS)
       (PN)      (JR) :              (AB)            (PF)            (AB)
@@ -78,7 +88,7 @@ csu
          '   '   '   '   '   '   '   '   '   '   '   '   '   '   '   '
         11  12  13  14  15  16  17  18  19  20  21  22  23  24  25  26
 
-### Colors pallete
+### Color pallete
 
 Use this color pallete:
 
