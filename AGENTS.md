@@ -4,6 +4,91 @@
 
 **Target audience:** Czech people -> All text visible on frontend has to be written in czech.
 
+**Infrastructure as code:** Infrastructure is defined in `infra/` director and is managed by terraform
+
+### Český statistický úřad (ČSÚ)
+
+- **Attribution:** name ČSÚ as the data source, without implying that ČSÚ endorses you or your use of the data. 
+csu
+- **Don’t distort meaning:** use the data only in ways that don’t change or alter its meaning. 
+csu
+- **Link the license:** if you redistribute ČSÚ data, you must state the license terms, ideally by linking directly to the terms page.
+- Don’t use ČSÚ’s logo in a way that suggests an official app.
+- Don't present your custom derived metrics, forecasts or recomputed indices, as ČSÚ’s figures. Label them as custom calculations based on ČSÚ data.
+- Include API url in every chart in the app.
+
+#### Target architecture
+
+- Cache the data in our infra rather than proxying every user request to the ČSÚ API. This protects from outages and keeps a polite API consumer.
+- Prototype can be done with proxy API calls.
+
+ ┌──────────┐  cron/daily   ┌─────────────┐      ┌──────────┐
+ │ ČSÚ API  │ ───────────▶  │ ETL (Python)│ ───▶ │ DB /     │
+ │ DataStat │ CSV/JSON-STAT └─────────────┘      │ S3 cache │
+ └──────────┘                                    └─────┬────┘
+                                                       │
+                                              ┌────────▼──────────┐
+                                              │ Dashboard (React) │
+                                              │ footer: "Zdroj:   │
+                                              │ ČSÚ" + link       │
+                                              └───────────────────┘
+
+#### Example attribution footer
+
+```html
+<footer>
+  Zdroj dat: Český statistický úřad (ČSÚ) ·{" "}
+  <a href="https://csu.gov.cz/podminky_pro_vyuzivani_a_dalsi_zverejnovani_statistickych_udaju_csu">
+    Podmínky užití
+  </a>
+  {" "}· Tato aplikace není spojena s ČSÚ.
+</footer>
+```
+
+### Charts
+
+- Include last valid date information in every chart in the app - current timestamp in case of prototype or cron run timestamp in case of cached data.
+- Include corresponding API url in every chart in the app, so the user can click and see the results in direct link.
+- Include picture of prime ministers above the chart with dashed vertical line marking the periods they were voted in.
+
+                    (BS)
+      (PN)      (JR) :              (AB)            (PF)            (AB)
+ 19 % |            : :               :               :               :
+      |            : :               :               : **            :
+      |            : :               :               : **  ◄ 18,0 %  :
+      |            : :               :               : ***  (9/2022) :
+      |            : :               :               : * *           :
+ 14 % |            : :               :               :** **          :
+      |            : :               :               :*   *          :
+      |            : :               :               :*   *          :
+      |            : :               :               :*   *          :
+      |            : :               :               **   **         :
+  9 % |            : :               :               *     *         :
+      |            : :               :               *     **        :
+      |            : :               :               *      *        :
+      |            : :               :              **      *        :
+      |            : :               :              *:      **       :
+  4 % |      **    : :               :       **    **:       *       :
+      |     *****  : :               :  ************ :       * ***** :
+      |******   **** :░░░░░░░░░░*********        **  :       ***   *****
+      |            ***░░░░░░░░░**    :               :               : *
+      |            : ***********░░░░░:               :               :
+ -1 % |            : :               :               :               :
+      +-----------------------------------------------------------------
+         '   '   '   '   '   '   '   '   '   '   '   '   '   '   '   '
+        11  12  13  14  15  16  17  18  19  20  21  22  23  24  25  26
+
+### Colors pallete
+
+Use this color pallete:
+
+| R/G/B | Hex |
+| --- | --- |
+| 110/99/71 | #6E6347 |
+| 25/44/38 | #192C26 |
+| 82/104/93 | #52685D |
+| 169/188/170 | #A9BCAA |
+
 ## 1. Think Before Coding
 
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
