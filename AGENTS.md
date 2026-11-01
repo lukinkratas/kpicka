@@ -6,7 +6,7 @@
 
 **Infrastructure as code:** Infrastructure is defined in `infra/` director and is managed by terraform
 
-**MCPs:** You should have Playwright and Chrome DevTools mcps avaiable in order to check your own work.
+**MCPs:** You should have Playwright and Chrome DevTools mcps available in order to check your own work.
 
 ### Český statistický úřad (ČSÚ)
 

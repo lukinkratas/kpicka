@@ -3,6 +3,7 @@ import { defineConfig, type ProxyOptions } from 'vite'
 
 // The providers do not all allow browser CORS. Forward each request without caching.
 const proxy = Object.fromEntries([
+  ['cnb', 'https://www.cnb.cz'],
   ['csu', 'https://data.csu.gov.cz'],
   ['mf', 'https://data.mf.gov.cz'],
   ['cssz', 'https://data.cssz.cz'],
