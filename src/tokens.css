@@ -1,0 +1,22 @@
+/* Shared by CSS and SVG/Recharts attributes through var(--color-…). */
+:root {
+  --color-text: #192c26;
+  --color-text-muted: #52685d;
+  --color-accent: #6e6347;
+  --color-sage: #a9bcaa;
+  --color-surface: #fff;
+  --color-canvas: #f5f6f1;
+  --color-border: #dce2d8;
+  --color-border-subtle: #edf0e9;
+  --color-chart-grid: #e1e5df;
+  --color-surface-footer: color-mix(in srgb, var(--color-sage) 20%, transparent);
+  --color-surface-filter: color-mix(in srgb, var(--color-sage) 35%, transparent);
+  --color-surface-reading: color-mix(in srgb, var(--color-sage) 28%, transparent);
+  --color-border-accent: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  --color-surface-accent: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  --color-surface-selected: color-mix(in srgb, var(--color-surface) 75%, transparent);
+  --color-party-ods: #1a438f;
+  --color-party-ano: #282359;
+  --color-party-cssd: #e8903d;
+  --color-party-nonpartisan: var(--color-text-muted);
+}

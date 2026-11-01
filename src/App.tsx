@@ -1,122 +1,605 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useEffect, useState } from "react";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  END,
+  START,
+  loadMetric,
+  metrics,
+  sourcePages,
+  sources,
+  type Metric,
+  type MetricData,
+} from "./data";
+import { partyColors, premiers, type Party } from "./premiers";
+import { splitByTerm } from "./chartData";
+import "./App.css";
 
-function App() {
-  const [count, setCount] = useState(0)
+const format = (n: number, digits = 0) =>
+  new Intl.NumberFormat("cs-CZ", { maximumFractionDigits: digits }).format(n);
+const date = (time: number) => new Date(time).toLocaleDateString("cs-CZ", { timeZone: "UTC" });
+const ticks = Array.from(
+  { length: Math.floor((new Date(END).getUTCFullYear() - 2010) / 2) + 1 },
+  (_, i) => Date.UTC(2010 + i * 2, 0, 1),
+);
+const groups: { id: string; title: string; ids: Metric[]; units: string[] }[] = [
+  {
+    id: "income",
+    title: "Inflace, mzdy a důchody",
+    ids: ["inflation", "wages", "pensions"],
+    units: ["%", "Kč"],
+  },
+  {
+    id: "prices",
+    title: "Inflace, energie a bydlení",
+    ids: ["inflation", "energy", "housing"],
+    units: ["%", "Kč/MWh", "Kč/m²"],
+  },
+  { id: "debt", title: "Státní dluh a HDP", ids: ["debt", "gdpAbsolute"], units: ["mld. Kč"] },
+  {
+    id: "employment",
+    title: "Nezaměstnanost a růst HDP",
+    ids: ["unemployment", "gdp", "interest", "inflation"],
+    units: ["%"],
+  },
+];
+const dashes = ["", "7 4", "2 4", "10 3 2 3"];
+type Result = MetricData & { loaded: number };
+type Results = Partial<Record<Metric, Result>>;
 
+function DataFormatLinks({ id }: { id: keyof typeof sources }) {
+  if (id === "interest")
+    return (
+      <>
+        {" "}
+        ·{" "}
+        <a href={sources.interest} target="_blank" rel="noreferrer">
+          TXT ↗
+        </a>
+      </>
+    );
+  if (!sources[id].startsWith("https://data.csu.gov.cz/")) return null;
   return (
     <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
+      {" · "}
+      <a
+        href={sources[id].replace("?format=CSV", "")}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`${id === "gas" ? "Plyn" : metrics.find((m) => m.id === id)!.title} – JSON`}
+      >
+        JSON ↗
+      </a>
+      {" · "}
+      <a
+        href={sources[id]}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`${id === "gas" ? "Plyn" : metrics.find((m) => m.id === id)!.title} – CSV`}
+      >
+        CSV ↗
+      </a>
     </>
-  )
+  );
 }
 
-export default App
+function ComparisonCard({
+  group,
+  results,
+  errors,
+  retry,
+  active,
+}: {
+  group: (typeof groups)[number];
+  results: Results;
+  errors: Partial<Record<Metric, string>>;
+  retry: (id: Metric) => void;
+  active: boolean[];
+}) {
+  const series = group.ids.flatMap((id) => {
+    const metric = metrics.find((m) => m.id === id)!;
+    const primary = { ...metric, points: results[id]?.points ?? [] };
+    return id === "energy"
+      ? [
+          { ...primary, title: "Elektřina" },
+          {
+            ...primary,
+            title: "Plyn",
+            points: primary.points
+              .filter((p) => p.gas !== undefined)
+              .map((p) => ({ ...p, value: p.gas! })),
+          },
+        ]
+      : [primary];
+  });
+  const chartData = [...new Set(series.flatMap((s) => s.points.map((p) => p.time)))]
+    .sort((a, b) => a - b)
+    .map((time) => ({ time }));
+  return (
+    <article className="metric-card" id={group.id}>
+      <div className="card-top">
+        <span className="eyebrow">ČESKÁ REPUBLIKA / SROVNÁNÍ</span>
+        <span className="unit">2010 — {new Date(END).getUTCFullYear()}</span>
+      </div>
+      <h2>{group.title}</h2>
+      <p className="subtitle">
+        {group.units.length > 1
+          ? "Různé jednotky mají samostatné osy. Výšky křivek nelze přímo porovnávat."
+          : group.id === "debt"
+            ? "Stav dluhu a čtvrtletní HDP v běžných cenách · mld. Kč"
+            : "Nezaměstnanost, růst HDP, 2T repo sazba ČNB a inflace · %"}
+      </p>
+      <div className="series-readings">
+        {series.map((s, i) => {
+          const latest = s.points.at(-1);
+          return (
+            <div key={s.title}>
+              <span>
+                <svg width="30" height="10" aria-hidden="true">
+                  <line
+                    x1="0"
+                    x2="30"
+                    y1="5"
+                    y2="5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeDasharray={dashes[i]}
+                  />
+                </svg>
+                {s.title}
+              </span>
+              <strong>
+                {latest
+                  ? format(latest.value, s.id === "interest" ? 2 : s.unit === "%" ? 1 : 0)
+                  : "—"}{" "}
+                <small>{s.unit}</small>
+              </strong>
+              <small>{latest?.period ?? "Čekáme na zdroj dat"}</small>
+            </div>
+          );
+        })}
+      </div>
+      <div className="legend" aria-label="Legenda ukazatelů">
+        {series.map((s, i) => (
+          <span key={s.title}>
+            <svg width="30" height="10" aria-hidden="true">
+              <line
+                x1="0"
+                x2="30"
+                y1="5"
+                y2="5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeDasharray={dashes[i]}
+              />
+            </svg>
+            {s.title} ({s.unit})
+          </span>
+        ))}
+      </div>
+      {chartData.length > 0 && (
+        <div
+          className="chart"
+          role="img"
+          aria-label={`${group.title}, od 1. ledna 2010 do ${date(END)}`}
+        >
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={chartData} margin={{ left: 0, right: 0, top: 12, bottom: 0 }}>
+              <CartesianGrid
+                vertical={false}
+                stroke="var(--color-chart-grid)"
+                strokeDasharray="3 4"
+              />
+              <XAxis
+                type="number"
+                dataKey="time"
+                domain={[START, END]}
+                ticks={ticks}
+                tickFormatter={(t) => String(new Date(t).getUTCFullYear()).slice(2)}
+                tickLine={false}
+                axisLine={false}
+                fontSize={11}
+                tickMargin={12}
+              />
+              {group.units.map((unit, i) => (
+                <YAxis
+                  key={unit}
+                  yAxisId={unit}
+                  orientation={i === 0 ? "left" : "right"}
+                  width={unit === "%" ? 40 : 58}
+                  tickFormatter={(v) =>
+                    Math.abs(v) >= 10000
+                      ? `${format(v / 1000)} tis.`
+                      : format(v, unit === "%" ? 1 : 0)
+                  }
+                  label={{
+                    value: unit,
+                    angle: -90,
+                    position: i === 0 ? "insideLeft" : "insideRight",
+                    fontSize: 10,
+                  }}
+                  axisLine={false}
+                  tickLine={false}
+                  fontSize={10}
+                  domain={["auto", "auto"]}
+                />
+              ))}
+              {premiers
+                .filter((p) => p.time >= START)
+                .map((p) => (
+                  <ReferenceLine
+                    key={p.start}
+                    yAxisId={group.units[0]}
+                    x={p.time}
+                    stroke={partyColors[p.party]}
+                    strokeOpacity={0.3}
+                    strokeDasharray="3 4"
+                  />
+                ))}
+              <Tooltip
+                content={({ active: visible, label }) => {
+                  if (!visible) return null;
+                  const time = Number(label);
+                  const term = premiers.findLastIndex((p) => p.time <= time);
+                  return (
+                    <div className="chart-tooltip">
+                      <strong>{date(time)}</strong>
+                      <p>
+                        {premiers[term]?.name} · {premiers[term]?.party}
+                      </p>
+                      {series.map((s) => {
+                        const point = s.points.find((p) => p.time === time);
+                        return (
+                          point && (
+                            <p key={s.title}>
+                              {s.title}:{" "}
+                              {format(
+                                point.value,
+                                s.id === "interest" ? 2 : s.unit === "%" ? 1 : 0,
+                              )}{" "}
+                              {s.unit}
+                            </p>
+                          )
+                        );
+                      })}
+                    </div>
+                  );
+                }}
+              />
+              {series.flatMap((s, i) =>
+                splitByTerm(s.points, s.id === "interest").map((points, term) => (
+                  <Line
+                    key={`${s.title}-${term}`}
+                    data={points}
+                    yAxisId={s.unit}
+                    name={s.title}
+                    type={s.id === "interest" ? "stepAfter" : "linear"}
+                    dataKey="value"
+                    stroke={partyColors[premiers[term].party]}
+                    strokeOpacity={active[term] ? 1 : 0.12}
+                    strokeDasharray={dashes[i]}
+                    strokeWidth={2.3}
+                    dot={false}
+                    activeDot={false}
+                    isAnimationActive={false}
+                  />
+                )),
+              )}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+      {group.ids.map((id) =>
+        errors[id] ? (
+          <div className="source-error" role="status" key={id}>
+            <span>
+              {metrics.find((m) => m.id === id)!.title}: Data se nepodařilo načíst. {errors[id]}
+            </span>
+            <button onClick={() => retry(id)}>Zkusit znovu ↻</button>
+          </div>
+        ) : (
+          !results[id] && (
+            <p role="status" key={id}>
+              Načítáme {metrics.find((m) => m.id === id)!.title.toLocaleLowerCase("cs")} ze zdroje…
+            </p>
+          )
+        ),
+      )}
+      <details>
+        <summary>Co přesně graf ukazuje</summary>
+        {group.ids
+          .flatMap((id) => (id === "energy" ? [id, "gas" as const] : [id]))
+          .map((id) => {
+            const result = results[id === "gas" ? "energy" : id];
+            const metadata = result?.metadata[id];
+            return (
+              <section key={id} className="source-metadata">
+                <h3>{id === "gas" ? "Plyn" : metrics.find((m) => m.id === id)!.title}</h3>
+                {metadata ? (
+                  <>
+                    {metadata.label && <p>{metadata.label}</p>}
+                    <dl>
+                      {metadata.fields.map((field, i) => (
+                        <div key={i}>
+                          <dt>{field.label}</dt>
+                          <dd>{field.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                    {metadata.notes.map((note) => (
+                      <p key={note}>{note}</p>
+                    ))}
+                  </>
+                ) : (
+                  <p>{result ? "Metadata zdroje nejsou dostupná." : "Načítáme metadata zdroje…"}</p>
+                )}
+                {result && (
+                  <p>
+                    Zobrazené období: {result.points[0].period} – {result.points.at(-1)!.period}
+                  </p>
+                )}
+              </section>
+            );
+          })}
+      </details>
+      {group.ids.includes("gdp") && (
+        <p className="calculation-note">
+          Vlastní výpočet aplikace: růst HDP = objemový index ČSÚ − 100.
+        </p>
+      )}
+      {group.ids.includes("gdpAbsolute") && (
+        <p className="calculation-note">
+          Vlastní převod aplikace: HDP v mld. Kč = údaj ČSÚ v mil. Kč ÷ 1 000.
+        </p>
+      )}
+      <footer className="card-footer">
+        {group.ids.map((id) => (
+          <div key={id}>
+            Dostupné na: {metrics.find((m) => m.id === id)!.source} ·{" "}
+            <a href={sourcePages[id]} target="_blank" rel="noreferrer">
+              {metrics.find((m) => m.id === id)!.title} ↗
+            </a>
+            <DataFormatLinks id={id} />
+            {id === "energy" && (
+              <>
+                {" "}
+                ·{" "}
+                <a href={sourcePages.gas} target="_blank" rel="noreferrer">
+                  Plyn ↗
+                </a>
+                <DataFormatLinks id="gas" />
+              </>
+            )}
+            <span>
+              {results[id]
+                ? `Načteno: ${new Date(results[id]!.loaded).toLocaleString("cs-CZ")}`
+                : "Zatím bez platného načtení"}
+            </span>
+          </div>
+        ))}
+      </footer>
+    </article>
+  );
+}
+
+function App() {
+  const [results, setResults] = useState<Results>({});
+  const [errors, setErrors] = useState<Partial<Record<Metric, string>>>({});
+  const [attempts, setAttempts] = useState<Partial<Record<Metric, number>>>({});
+  const [excludedTerms, setExcludedTerms] = useState<string[]>([]);
+  const [excludedParties, setExcludedParties] = useState<Party[]>([]);
+  useEffect(() => {
+    const controllers = metrics
+      .filter((m) => !results[m.id])
+      .map((metric) => {
+        const controller = new AbortController();
+        const timeout = setTimeout(
+          () => controller.abort(new Error("Časový limit načítání vypršel.")),
+          45000,
+        );
+        loadMetric(metric.id, controller.signal)
+          .then((data) => {
+            if (!controller.signal.aborted) {
+              setResults((previous) => ({
+                ...previous,
+                [metric.id]: { ...data, loaded: Date.now() },
+              }));
+              setErrors((previous) => ({ ...previous, [metric.id]: undefined }));
+            }
+          })
+          .catch((error: Error) => {
+            if (controller.signal.reason !== "unmount")
+              setErrors((previous) => ({ ...previous, [metric.id]: error.message }));
+          })
+          .finally(() => clearTimeout(timeout));
+        return { controller, timeout };
+      });
+    return () =>
+      controllers.forEach(({ controller, timeout }) => {
+        clearTimeout(timeout);
+        controller.abort("unmount");
+      });
+    // Results are retained in component state; retries load only missing sources.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attempts]);
+  const active = premiers.map(
+    (p) => !excludedTerms.includes(p.start) && !excludedParties.includes(p.party),
+  );
+  return (
+    <>
+      <main>
+        <section className="intro">
+          <h1>KPIčka</h1>
+          <p className="intro-quote">
+            „Ono se to nějak vyvrbí. Ještě nikdy nebylo, aby nějak nebylo.“ - Dobrý voják Švejk
+          </p>
+          <p>
+            Devět ukazatelů. Jedna časová osa. Prohlédněte si vývoj české ekonomiky
+            <br className="desktop-break" /> a životní úrovně v kontextu jednotlivých vlád.
+          </p>
+          <div className="intro-bottom">
+            <span className="period">
+              <span>◷</span> 2010 — {date(END)}
+            </span>
+            <span className="live">
+              <i /> Živá data z veřejných zdrojů
+            </span>
+          </div>
+        </section>
+        <section className="filters" aria-label="Filtry vlád a politických stran">
+          <div className="filter-heading">
+            <h2>Vlády v čase</h2>
+            <button
+              onClick={() => {
+                setExcludedTerms([]);
+                setExcludedParties([]);
+              }}
+            >
+              Zobrazit vše ↻
+            </button>
+          </div>
+          <p>
+            Kliknutím na období nebo stranu ztlumíte odpovídající části všech grafů. Časová osa
+            zůstává stejná.
+          </p>
+          <div className="timeline-scroll">
+            <div className="premier-strip">
+              {premiers.map((p, i) => {
+                const start = Math.max(START, p.time),
+                  end = premiers[i + 1]?.time ?? END;
+                return (
+                  <button
+                    key={p.start}
+                    className={active[i] ? "" : "faded"}
+                    aria-pressed={!excludedTerms.includes(p.start)}
+                    aria-label={`${p.name} · ${p.party} · ${date(start)} – ${date(end)}`}
+                    title={`${p.name} · ${p.party} · vláda od ${date(p.time)} do ${date(end)}`}
+                    style={{
+                      left: `${((start - START) / (END - START)) * 100}%`,
+                      width: `${((end - start) / (END - START)) * 100}%`,
+                      borderColor: partyColors[p.party],
+                    }}
+                    onClick={() =>
+                      setExcludedTerms((previous) =>
+                        previous.includes(p.start)
+                          ? previous.filter((t) => t !== p.start)
+                          : [...previous, p.start],
+                      )
+                    }
+                  >
+                    <img src={p.image} alt={p.name} />
+                    <span>{p.name}</span>
+                    <small>{p.party}</small>
+                  </button>
+                );
+              })}
+              <div className="timeline-years">
+                {ticks.map((time) => (
+                  <span key={time} style={{ left: `${((time - START) / (END - START)) * 100}%` }}>
+                    {new Date(time).getUTCFullYear()}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="party-filters" aria-label="Politické strany">
+            <strong>Strany premiérů</strong>
+            {(Object.keys(partyColors) as Party[]).map((party) => (
+              <button
+                key={party}
+                aria-pressed={!excludedParties.includes(party)}
+                className={excludedParties.includes(party) ? "faded" : ""}
+                onClick={() =>
+                  setExcludedParties((previous) =>
+                    previous.includes(party)
+                      ? previous.filter((p) => p !== party)
+                      : [...previous, party],
+                  )
+                }
+              >
+                <i style={{ background: partyColors[party] }} />
+                {party}
+              </button>
+            ))}
+          </div>
+          <p className="filter-note">
+            Období vymezujeme nástupem vlád do funkce, nikoli datem voleb. Nestr. = nestranický
+            premiér úřednické vlády. Filtry se kombinují; zvýrazněná jsou období povolená oběma
+            filtry.
+          </p>
+        </section>
+        <nav className="metric-nav" aria-label="Ukazatele">
+          {groups.map((g) => (
+            <a key={g.id} href={`#${g.id}`}>
+              {g.title}
+            </a>
+          ))}
+        </nav>
+        <div className="section-heading">
+          <h2>Přehled ukazatelů</h2>
+          <span>ČSÚ · MF ČR · ČSSZ · ČNB</span>
+        </div>
+        <section className="dashboard" aria-label="Ekonomické ukazatele">
+          {groups.map((group) => (
+            <ComparisonCard
+              key={group.id}
+              group={group}
+              results={results}
+              errors={errors}
+              active={active}
+              retry={(id) => {
+                setErrors((previous) => ({ ...previous, [id]: undefined }));
+                setAttempts((previous) => ({ ...previous, [id]: (previous[id] ?? 0) + 1 }));
+              }}
+            />
+          ))}
+        </section>
+        <section className="about" id="zdroje">
+          <h2>Veřejná data. Otevřený kontext.</h2>
+          <p>
+            Grafy načítáme přímo z veřejných zdrojů při otevření stránky, bez ukládání do cache.
+            Každý ukazatel má vlastní četnost a datum posledního pozorování. Prázdná část grafu
+            znamená, že použitý zdroj pro dané období neposkytuje data.
+          </p>
+          <p>
+            Portréty premiérů pocházejí z hlavních obrázků české Wikipedie. Informace o obrázcích a
+            jejich licencích:{" "}
+            {premiers
+              .filter((p, i) => premiers.findIndex((other) => other.name === p.name) === i)
+              .map((p) => (
+                <a key={p.name} href={p.wiki} target="_blank" rel="noreferrer">
+                  {p.name} ↗{" "}
+                </a>
+              ))}
+          </p>
+        </section>
+      </main>
+      <footer className="site-footer">
+        <strong>Česko v číslech</strong>
+        <p>
+          Zdroj dat: Český statistický úřad (ČSÚ), Ministerstvo financí ČR, Česká správa sociálního
+          zabezpečení a Česká národní banka (ČNB).
+        </p>
+        <p>
+          <a
+            href="https://csu.gov.cz/podminky_pro_vyuzivani_a_dalsi_zverejnovani_statistickych_udaju_csu"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Podmínky užití dat ČSÚ ↗
+          </a>{" "}
+          · Tato aplikace není spojena s ČSÚ ani ostatními poskytovateli dat.
+        </p>
+      </footer>
+    </>
+  );
+}
+export default App;
