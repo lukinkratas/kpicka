@@ -24,22 +24,6 @@ csu
 - https://data.csu.gov.cz/api/katalog/v1/sady
 - swagger UI: https://data.csu.gov.cz/api/katalog/v1/swagger-ui/index.html
 
-#### Target architecture
-
-- Cache the data in our infra rather than proxying every user request to the ČSÚ API. This protects from outages and keeps a polite API consumer.
-- Prototype will be done with proxy API calls.
-
- ┌──────────┐  cron/daily   ┌─────────────┐      ┌──────────┐
- │ ČSÚ API  │ ───────────▶  │ ETL (Python)│ ───▶ │ DB /     │
- │ DataStat │ CSV/JSON-STAT └─────────────┘      │ S3 cache │
- └──────────┘                                    └─────┬────┘
-                                                       │
-                                              ┌────────▼──────────┐
-                                              │ Dashboard (React) │
-                                              │ footer: "Zdroj:   │
-                                              │ ČSÚ" + link       │
-                                              └───────────────────┘
-
 #### Example attribution footer
 
 ```html
@@ -61,7 +45,7 @@ csu
 
 #### Color pallete
 
-Use this color pallete: #6E6347 (RGB:110/99/71), #192C26 (RGB: 25/44/38), #52685D (RGB: 82/104/93), #A9BCAA (RGB: 169/188/170)
+Use this color pallete: #6E6347 (RGB:110/99/71), #192C26 (RGB: 25/44/38), #52685D (RGB: 82/104/93), #A9BCAA (RGB: 169/188/170), #d19e61 (RGB: 209/158/97)
 *Note: Color pallete is `Dobrý voják Švejk` inspired.*
 
 ## 1. Think Before Coding
