@@ -62,15 +62,7 @@ csu
 
 #### Color pallete
 
-Use this color pallete:
-
-| R/G/B | Hex |
-| --- | --- |
-| 110/99/71 | #6E6347 |
-| 25/44/38 | #192C26 |
-| 82/104/93 | #52685D |
-| 169/188/170 | #A9BCAA |
-
+Use this color pallete: #6E6347 (RGB:110/99/71), #192C26 (RGB: 25/44/38), #52685D (RGB: 82/104/93), #A9BCAA (RGB: 169/188/170)
 *Note: Color pallete is `Dobrý voják Švejk` inspired.*
 
 ## 1. Think Before Coding
