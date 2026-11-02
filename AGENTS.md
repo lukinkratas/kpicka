@@ -4,9 +4,8 @@
 
 **Target audience:** Czech people -> All text visible on frontend has to be written in czech.
 
-**Infrastructure as code:** Infrastructure is defined in `infra/` director and is managed by terraform
+**Tools:** You should have playwright-cli and Chrome DevTools mcps available for app inpection.
 
-**MCPs:** You should have Playwright and Chrome DevTools mcps available in order to check your own work.
 ### Český statistický úřad (ČSÚ)
 
 - **Attribution:** name ČSÚ as the data source, without implying that ČSÚ endorses you or your use of the data. 
