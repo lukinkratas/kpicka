@@ -1,7 +1,7 @@
 import { splitByTerm } from '../src/chartData'
 import { premiers } from '../src/premiers'
 import { test, expect } from '@playwright/test'
-import { parseCsv, readMetadata, parseInterest, START, END, periodTime, selectPoints } from '../src/data'
+import { parseCsv, readMetadata, parseInterest, START, END, periodTime, selectPoints, loadMetric } from '../src/data'
 
 test('parses quoted MF headers and mixed thousands/decimal separators', () => {
   const csv = 'rok,"STÁTNÍ\nDLUH",poznámka\r\n2013,"1\u00a0683,3","text s ""uvozovkami"""\r\n2020," 2 049,7",\r\n'
@@ -32,9 +32,34 @@ test('rejects ambiguous rows rather than merging different populations', () => {
 })
 
 
-test('converts nominal quarterly GDP to billions without changing its meaning', () => {
-  const points = selectPoints('gdpAbsolute', [{ Ukazatel: 'Hrubý domácí produkt (mil. Kč, běžné ceny)', Území: 'Česko', Čtvrtletí: '2. čtvrtletí 2025', Hodnota: '2248976' }])
-  expect(points[0].value).toBe(2248.976)
+test('sums the latest four consecutive GDP quarters in billions, using pre-2010 quarters', () => {
+  const row = (Čtvrtletí: string, Hodnota: string) => ({ Ukazatel: 'Hrubý domácí produkt (mil. Kč, běžné ceny)', Území: 'Česko', Čtvrtletí, Hodnota })
+  const points = selectPoints('gdpAbsolute', [
+    row('2. čtvrtletí 2009', '900000'), row('3. čtvrtletí 2009', '950000'), row('4. čtvrtletí 2009', '1000000'),
+    row('1. čtvrtletí 2010', '920000'), row('3. čtvrtletí 2010', '980000'),
+  ])
+  expect(points).toHaveLength(1)
+  expect(points[0]).toMatchObject({ time: Date.UTC(2010, 2, 31), period: '2. čtvrtletí 2009 – 1. čtvrtletí 2010' })
+  expect(points[0].value).toBeCloseTo(3770)
+})
+
+test('reports missing source columns in Czech', () => {
+  expect(() => selectPoints('wages', [{ Ukazatel: 'Medián měsíčních mezd (Kč)', Pohlaví: 'Celkem', Území: 'Česko', Hodnota: '41742' }])).toThrow('očekávané sloupce')
+})
+
+test('keeps observations when metadata is malformed and reports network failures in Czech', async () => {
+  const original = globalThis.fetch
+  const csv = 'Ukazatel,Pohlaví,Území,Roky,Hodnota\nMedián měsíčních mezd (Kč),Celkem,Česko,2024,41742\n'
+  try {
+    globalThis.fetch = async input => String(input).includes('format=CSV') ? new Response(csv) : Response.json({})
+    const data = await loadMetric('wages', new AbortController().signal)
+    expect(data.points).toHaveLength(1)
+    expect(data.metadata).toBeUndefined()
+    globalThis.fetch = async () => { throw new TypeError('Failed to fetch') }
+    await expect(loadMetric('wages', new AbortController().signal)).rejects.toThrow('chyba sítě')
+  } finally {
+    globalThis.fetch = original
+  }
 })
 
 

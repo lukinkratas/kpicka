@@ -1,5 +1,5 @@
 export type Row = Record<string, string>
-export type Point = { time: number; period: string; value: number; gas?: number }
+export type Point = { time: number; period: string; value: number }
 export const START = Date.UTC(2010, 0, 1)
 export const END = Date.now()
 const csu = (id: string) => `https://data.csu.gov.cz/api/dotaz/v1/data/vybery/${id}?format=CSV`
@@ -21,15 +21,16 @@ export const sourcePages = {
   housing: csuTable('WCEN04T01'), wages: csuTable('ZAMG08T1'),
   pensions: 'https://data.cssz.cz/web/otevrena-data/graf-mesicni-vyse-duchodu-podle-roku-kvantilu-a-druhu-duchodu',
 }
-export type Metric = keyof Omit<typeof sources, 'gas'>
+export type Metric = keyof typeof sources
 export const metrics: { id: Metric; title: string; subtitle: string; unit: string; source: string }[] = [
   { id: 'interest', title: 'Úroková sazba ČNB', subtitle: 'Dvoutýdenní repo sazba', unit: '%', source: 'ČNB' },
   { id: 'inflation', title: 'Inflace', subtitle: 'Meziroční změna spotřebitelských cen', unit: '%', source: 'ČSÚ' },
-  { id: 'gdpAbsolute', title: 'HDP v běžných cenách', subtitle: 'Čtvrtletní HDP · absolutní hodnota', unit: 'mld. Kč', source: 'ČSÚ' },
+  { id: 'gdpAbsolute', title: 'HDP za poslední 4 čtvrtletí', subtitle: 'Klouzavý roční součet · běžné ceny', unit: 'mld. Kč', source: 'ČSÚ' },
   { id: 'gdp', title: 'HDP', subtitle: 'Meziroční reálný růst · sezonně očištěno', unit: '%', source: 'ČSÚ' },
   { id: 'unemployment', title: 'Nezaměstnanost', subtitle: 'Obecná míra nezaměstnanosti · celkem', unit: '%', source: 'ČSÚ' },
   { id: 'debt', title: 'Státní dluh', subtitle: 'Celkový státní dluh · stav na konci období', unit: 'mld. Kč', source: 'MF ČR' },
-  { id: 'energy', title: 'Cena energií', subtitle: 'Ceníkové ceny pro domácnosti · celkem', unit: 'Kč/MWh', source: 'ČSÚ' },
+  { id: 'energy', title: 'Elektřina', subtitle: 'Ceníkové ceny pro domácnosti · celkem', unit: 'Kč/MWh', source: 'ČSÚ' },
+  { id: 'gas', title: 'Plyn', subtitle: 'Ceníkové ceny pro domácnosti · celkem', unit: 'Kč/MWh', source: 'ČSÚ' },
   { id: 'housing', title: 'Cena bydlení', subtitle: 'Průměrná kupní cena bytů v Česku', unit: 'Kč/m²', source: 'ČSÚ' },
   { id: 'wages', title: 'Medián mezd', subtitle: 'Hrubá měsíční mzda · ženy a muži celkem', unit: 'Kč', source: 'ČSÚ' },
   { id: 'pensions', title: 'Medián důchodů', subtitle: 'Starobní důchody vyplácené sólo', unit: 'Kč', source: 'ČSSZ' },
@@ -71,7 +72,7 @@ export function periodTime(period: string): number {
   return Date.UTC(year, 11, 31)
 }
 const numeric = (s: string) => s.trim() ? Number(s.replace(/\s/g, '').replace(',', '.')) : NaN
-function selectRows(id: Metric | 'gas', rows: Row[]): Row[] {
+function selectRows(id: Metric, rows: Row[]): Row[] {
   return rows.filter(r => {
     switch (id) {
       case 'inflation': return r.Ukazatel === 'Přírůstek indexu spotřebitelských cen ke stejnému měsíci předchozího roku' && r['Území'] === 'Česko'
@@ -86,12 +87,25 @@ function selectRows(id: Metric | 'gas', rows: Row[]): Row[] {
     }
   })
 }
-export function selectPoints(id: Metric | 'gas', rows: Row[]): Point[] {
-  const points = selectRows(id, rows).map(r => {
+// Custom calculation: annual nominal GDP as the sum of the latest four quarters, CZK millions → billions.
+function sumLastFourQuarters(points: Point[]): Point[] {
+  const quarter = (time: number) => new Date(time).getUTCFullYear() * 4 + Math.floor(new Date(time).getUTCMonth() / 3)
+  return points.flatMap((p, i) => {
+    const first = points[i - 3]
+    if (!first || quarter(p.time) - quarter(first.time) !== 3) return []
+    return [{ ...p, period: `${first.period} – ${p.period}`, value: points.slice(i - 3, i + 1).reduce((sum, q) => sum + q.value, 0) / 1000 }]
+  })
+}
+export function selectPoints(id: Metric, rows: Row[]): Point[] {
+  let points = selectRows(id, rows).map(r => {
     const period = r['Měsíce'] ?? r['Čtvrtletí'] ?? r['Pololetí'] ?? r.Roky ?? r.referencni_obdobi ?? r.rok
     const raw = id === 'debt' ? Object.values(r)[1] : id === 'pensions' ? r.mesicni_vyse_duchodu : r.Hodnota
-    return { time: periodTime(period), period, value: id === 'gdpAbsolute' ? numeric(raw) / 1000 : numeric(raw) - (id === 'gdp' ? 100 : 0) }
-  }).filter(p => Number.isFinite(p.value) && p.time >= START && p.time <= END).sort((a, b) => a.time - b.time)
+    if (period === undefined || raw === undefined) throw new Error('Zdroj nemá očekávané sloupce. Je nutné ověřit formát dat.')
+    return { time: periodTime(period), period, value: numeric(raw) - (id === 'gdp' ? 100 : 0) }
+  }).filter(p => Number.isFinite(p.value) && Number.isFinite(p.time)).sort((a, b) => a.time - b.time)
+  // Quarters before 2010 are needed for the first 2010 sums.
+  if (id === 'gdpAbsolute') points = sumLastFourQuarters(points)
+  points = points.filter(p => p.time >= START && p.time <= END)
   if (!points.length) throw new Error('Zdroj nevrátil platná data pro vybraný ukazatel.')
   if (new Set(points.map(p => p.time)).size !== points.length) throw new Error('Zdroj obsahuje více řad pro stejné období. Je nutné ověřit filtr.')
   return points
@@ -146,44 +160,39 @@ export function readMetadata(json: JsonStat, rows: Row[]): SourceMetadata {
   }
   return { label: json.label, fields, notes: [...new Set(notes.filter((s): s is string => !!s?.trim()))] }
 }
-export type MetricData = { points: Point[]; metadata: Partial<Record<Metric | 'gas', SourceMetadata>> }
+export type MetricData = { points: Point[]; metadata?: SourceMetadata }
 export async function loadMetric(id: Metric, signal: AbortSignal): Promise<MetricData> {
-  async function get(key: Metric | 'gas'): Promise<MetricData> {
-    const url = new URL(sources[key])
-    const isCsu = url.host === 'data.csu.gov.cz'
-    const prefix = isCsu ? '/api/csu' : url.host === 'data.mf.gov.cz' ? '/api/mf' : url.host === 'www.cnb.cz' ? '/api/cnb' : '/api/cssz'
-    const path = prefix + url.pathname
-    async function request(query: string) {
-      const response = await fetch(path + query, { signal, cache: 'no-store' })
-      if (!response.ok) throw new Error(`Zdroj dat je nedostupný (HTTP ${response.status}).`)
-      return response
-    }
-    // A metadata outage must not hide otherwise available observations.
-    const [response, json] = await Promise.all([
-      request(url.search),
-      isCsu ? request('').then(r => r.json() as Promise<JsonStat>).catch(() => null) : null,
-    ])
-    const text = new TextDecoder(key === 'debt' ? 'windows-1250' : 'utf-8').decode(await response.arrayBuffer())
-    const rows = key === 'interest' ? [] : parseCsv(text)
-    const selected = selectRows(key, rows)
-    const metadata: MetricData['metadata'] = {}
-    if (json) metadata[key] = readMetadata(json, selected)
-    else if (!isCsu) {
-      const headers = key === 'interest' ? text.replace(/^\uFEFF/, '').split(/\r?\n/)[0].split('|') : Object.keys(rows[0] ?? {})
-      const fields = [{ label: 'Sloupce zdroje', value: headers.join(' · ') }]
-      // Preserve constant source dimensions (including the exact pension/quantile codes).
-      for (const header of headers) {
-        const values = [...new Set(selected.map(row => row[header]).filter(Boolean))]
-        if (values.length === 1) fields.push({ label: header, value: values[0] })
-      }
-      metadata[key] = { fields, notes: [] }
-    }
-    return { points: key === 'interest' ? parseInterest(text) : selectPoints(key, rows), metadata }
+  const url = new URL(sources[id])
+  const isCsu = url.host === 'data.csu.gov.cz'
+  const prefix = isCsu ? '/api/csu' : url.host === 'data.mf.gov.cz' ? '/api/mf' : url.host === 'www.cnb.cz' ? '/api/cnb' : '/api/cssz'
+  const path = prefix + url.pathname
+  async function request(query: string) {
+    const response = await fetch(path + query, { signal, cache: 'no-store' }).catch(error => {
+      throw signal.aborted ? error : new Error('Zdroj dat je nedostupný (chyba sítě).')
+    })
+    if (!response.ok) throw new Error(`Zdroj dat je nedostupný (HTTP ${response.status}).`)
+    return response
   }
-  if (id !== 'energy') return get(id)
-  const [electricity, gas] = await Promise.all([get('energy'), get('gas')])
-  return {
-    points: electricity.points.map(p => ({ ...p, gas: gas.points.find(g => g.time === p.time)?.value })),
-    metadata: { ...electricity.metadata, ...gas.metadata },
+  // A metadata outage must not hide otherwise available observations.
+  const [response, json] = await Promise.all([
+    request(url.search),
+    isCsu ? request('').then(r => r.json() as Promise<JsonStat>).catch(() => null) : null,
+  ])
+  const text = new TextDecoder(id === 'debt' ? 'windows-1250' : 'utf-8').decode(await response.arrayBuffer())
+  const rows = id === 'interest' ? [] : parseCsv(text)
+  const selected = selectRows(id, rows)
+  let metadata: SourceMetadata | undefined
+  if (json) {
+    try { metadata = readMetadata(json, selected) } catch { /* Malformed metadata is shown as unavailable. */ }
+  } else if (!isCsu) {
+    const headers = id === 'interest' ? text.replace(/^\uFEFF/, '').split(/\r?\n/)[0].split('|') : Object.keys(rows[0] ?? {})
+    const fields = [{ label: 'Sloupce zdroje', value: headers.join(' · ') }]
+    // Preserve constant source dimensions (including the exact pension/quantile codes).
+    for (const header of headers) {
+      const values = [...new Set(selected.map(row => row[header]).filter(Boolean))]
+      if (values.length === 1) fields.push({ label: header, value: values[0] })
+    }
+    metadata = { fields, notes: [] }
   }
+  return { points: id === 'interest' ? parseInterest(text) : selectPoints(id, rows), metadata }
 }

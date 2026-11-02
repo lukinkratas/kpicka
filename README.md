@@ -24,9 +24,10 @@ The static production build requires equivalent proxy routes on its serving host
 
 - Interest rate: ČNB 2-week repo rate, effective-date history drawn as a step curve.
 - Inflation: monthly year-on-year consumer price change (ČSÚ).
-- Absolute GDP: ČSÚ NUC06QT01, quarterly nominal GDP at current prices,
-  converted from CZK millions to billions. Shown with state debt; quarterly
-  output and a debt stock are different quantities, not a debt/GDP ratio.
+- Absolute GDP: ČSÚ NUC06QT01, nominal GDP at current prices summed over the
+  latest four consecutive quarters (a rolling annual total, labeled as a custom
+  calculation) and converted from CZK millions to billions. Shown with state debt
+  on the same scale; it is not a debt/GDP ratio.
 - GDP growth: seasonally adjusted year-on-year volume index, converted to growth by
   subtracting 100. Uses the whole WNUC01B dataset, not its rolling table selection.
 - Unemployment: general unemployment rate, both sexes, ages 15–64 (ČSÚ).
@@ -62,6 +63,7 @@ classified as nonpartisan caretaker prime ministers, not as their former parties
 The shared timeline and party buttons combine to fade excluded periods without
 changing the time axis or deleting observations. Boundary interpolation is solely
 for drawing continuous color transitions and is excluded from tooltip readings.
+Tooltips show the repo rate in force at the hovered date.
 
 Chart details load ČSÚ JSON metadata alongside CSV observations on demand, without
 caching. Dataset titles, selected dimension/indicator labels, source units, time

@@ -162,10 +162,18 @@ h1 span {
 .dashboard {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
+  gap: 0 20px;
 }
 
+/* Cards share row bands (heading, readings, legend, chart, notes, footer) through
+   subgrid, so cards side by side align and footers reach the card bottom. */
 .metric-card {
+  display: grid;
+  grid-row: span 6;
+  grid-template-rows: subgrid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 0;
+  margin-bottom: 20px;
   min-width: 0;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -435,6 +443,7 @@ h1 span {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin: 22px 0;
+  align-content: start;
 }
 .series-readings > div {
   display: flex;
@@ -569,9 +578,10 @@ h1 span {
   }
   .dashboard {
     grid-template-columns: 1fr;
-    gap: 16px;
+    gap: 0;
   }
   .metric-card {
+    margin-bottom: 16px;
     padding: 21px 18px 0;
   }
   .card-footer {

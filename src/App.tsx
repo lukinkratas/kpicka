@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -40,7 +40,7 @@ const groups: { id: string; title: string; ids: Metric[]; units: string[] }[] = 
   {
     id: "prices",
     title: "Inflace, energie a bydlení",
-    ids: ["inflation", "energy", "housing"],
+    ids: ["inflation", "energy", "gas", "housing"],
     units: ["%", "Kč/MWh", "Kč/m²"],
   },
   { id: "debt", title: "Státní dluh a HDP", ids: ["debt", "gdpAbsolute"], units: ["mld. Kč"] },
@@ -52,21 +52,31 @@ const groups: { id: string; title: string; ids: Metric[]; units: string[] }[] = 
   },
 ];
 const dashes = ["", "7 4", "2 4", "10 3 2 3"];
+const termsOfUse = [
+  ["ČSÚ", "https://csu.gov.cz/podminky_pro_vyuzivani_a_dalsi_zverejnovani_statistickych_udaju_csu"],
+  ["MF ČR", sourcePages.debt],
+  ["ČSSZ", "https://data.cssz.cz/web/otevrena-data/podminky-uziti"],
+  [
+    "ČNB",
+    "https://www.cnb.cz/cs/ochrana-osobnich-udaju-a-pravni-ujednani/podminky-uzivani-internetovych-stranek-cnb/",
+  ],
+];
 type Result = MetricData & { loaded: number };
 type Results = Partial<Record<Metric, Result>>;
 
-function DataFormatLinks({ id }: { id: keyof typeof sources }) {
-  if (id === "interest")
+function DataFormatLinks({ id }: { id: Metric }) {
+  const title = metrics.find((m) => m.id === id)!.title;
+  if (!sources[id].startsWith("https://data.csu.gov.cz/")) {
+    const format = id === "interest" ? "TXT" : "CSV";
     return (
       <>
-        {" "}
-        ·{" "}
-        <a href={sources.interest} target="_blank" rel="noreferrer">
-          TXT ↗
+        {" · "}
+        <a href={sources[id]} target="_blank" rel="noreferrer" aria-label={`${title} – ${format}`}>
+          {format} ↗
         </a>
       </>
     );
-  if (!sources[id].startsWith("https://data.csu.gov.cz/")) return null;
+  }
   return (
     <>
       {" · "}
@@ -74,17 +84,12 @@ function DataFormatLinks({ id }: { id: keyof typeof sources }) {
         href={sources[id].replace("?format=CSV", "")}
         target="_blank"
         rel="noreferrer"
-        aria-label={`${id === "gas" ? "Plyn" : metrics.find((m) => m.id === id)!.title} – JSON`}
+        aria-label={`${title} – JSON`}
       >
         JSON ↗
       </a>
       {" · "}
-      <a
-        href={sources[id]}
-        target="_blank"
-        rel="noreferrer"
-        aria-label={`${id === "gas" ? "Plyn" : metrics.find((m) => m.id === id)!.title} – CSV`}
-      >
+      <a href={sources[id]} target="_blank" rel="noreferrer" aria-label={`${title} – CSV`}>
         CSV ↗
       </a>
     </>
@@ -104,39 +109,29 @@ function ComparisonCard({
   retry: (id: Metric) => void;
   active: boolean[];
 }) {
-  const series = group.ids.flatMap((id) => {
-    const metric = metrics.find((m) => m.id === id)!;
-    const primary = { ...metric, points: results[id]?.points ?? [] };
-    return id === "energy"
-      ? [
-          { ...primary, title: "Elektřina" },
-          {
-            ...primary,
-            title: "Plyn",
-            points: primary.points
-              .filter((p) => p.gas !== undefined)
-              .map((p) => ({ ...p, value: p.gas! })),
-          },
-        ]
-      : [primary];
-  });
+  const series = group.ids.map((id) => ({
+    ...metrics.find((m) => m.id === id)!,
+    points: results[id]?.points ?? [],
+  }));
   const chartData = [...new Set(series.flatMap((s) => s.points.map((p) => p.time)))]
     .sort((a, b) => a - b)
     .map((time) => ({ time }));
   return (
     <article className="metric-card" id={group.id}>
-      <div className="card-top">
-        <span className="eyebrow">ČESKÁ REPUBLIKA / SROVNÁNÍ</span>
-        <span className="unit">2010 — {new Date(END).getUTCFullYear()}</span>
+      <div className="card-heading">
+        <div className="card-top">
+          <span className="eyebrow">ČESKÁ REPUBLIKA / SROVNÁNÍ</span>
+          <span className="unit">2010 — {new Date(END).getUTCFullYear()}</span>
+        </div>
+        <h2>{group.title}</h2>
+        <p className="subtitle">
+          {group.units.length > 1
+            ? "Různé jednotky mají samostatné osy. Výšky křivek nelze přímo porovnávat."
+            : group.id === "debt"
+              ? "Stav dluhu a HDP za poslední 4 čtvrtletí v běžných cenách · mld. Kč"
+              : "Nezaměstnanost, růst HDP, 2T repo sazba ČNB a inflace · %"}
+        </p>
       </div>
-      <h2>{group.title}</h2>
-      <p className="subtitle">
-        {group.units.length > 1
-          ? "Různé jednotky mají samostatné osy. Výšky křivek nelze přímo porovnávat."
-          : group.id === "debt"
-            ? "Stav dluhu a čtvrtletní HDP v běžných cenách · mld. Kč"
-            : "Nezaměstnanost, růst HDP, 2T repo sazba ČNB a inflace · %"}
-      </p>
       <div className="series-readings">
         {series.map((s, i) => {
           const latest = s.points.at(-1);
@@ -185,144 +180,150 @@ function ComparisonCard({
           </span>
         ))}
       </div>
-      {chartData.length > 0 && (
-        <div
-          className="chart"
-          role="img"
-          aria-label={`${group.title}, od 1. ledna 2010 do ${date(END)}`}
-        >
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData} margin={{ left: 0, right: 0, top: 12, bottom: 0 }}>
-              <CartesianGrid
-                vertical={false}
-                stroke="var(--color-chart-grid)"
-                strokeDasharray="3 4"
-              />
-              <XAxis
-                type="number"
-                dataKey="time"
-                domain={[START, END]}
-                ticks={ticks}
-                tickFormatter={(t) => String(new Date(t).getUTCFullYear()).slice(2)}
-                tickLine={false}
-                axisLine={false}
-                fontSize={11}
-                tickMargin={12}
-              />
-              {group.units.map((unit, i) => (
-                <YAxis
-                  key={unit}
-                  yAxisId={unit}
-                  orientation={i === 0 ? "left" : "right"}
-                  width={unit === "%" ? 40 : 58}
-                  tickFormatter={(v) =>
-                    Math.abs(v) >= 10000
-                      ? `${format(v / 1000)} tis.`
-                      : format(v, unit === "%" ? 1 : 0)
-                  }
-                  label={{
-                    value: unit,
-                    angle: -90,
-                    position: i === 0 ? "insideLeft" : "insideRight",
-                    fontSize: 10,
-                  }}
-                  axisLine={false}
-                  tickLine={false}
-                  fontSize={10}
-                  domain={["auto", "auto"]}
+      <div className="card-chart">
+        {chartData.length > 0 && (
+          <div
+            className="chart"
+            role="img"
+            aria-label={`${group.title}, od 1. ledna 2010 do ${date(END)}`}
+          >
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={chartData} margin={{ left: 0, right: 0, top: 12, bottom: 0 }}>
+                <CartesianGrid
+                  vertical={false}
+                  stroke="var(--color-chart-grid)"
+                  strokeDasharray="3 4"
                 />
-              ))}
-              {premiers
-                .filter((p) => p.time >= START)
-                .map((p) => (
-                  <ReferenceLine
-                    key={p.start}
-                    yAxisId={group.units[0]}
-                    x={p.time}
-                    stroke={partyColors[p.party]}
-                    strokeOpacity={0.3}
-                    strokeDasharray="3 4"
+                <XAxis
+                  type="number"
+                  dataKey="time"
+                  domain={[START, END]}
+                  ticks={ticks}
+                  tickFormatter={(t) => String(new Date(t).getUTCFullYear()).slice(2)}
+                  tickLine={false}
+                  axisLine={false}
+                  fontSize={11}
+                  tickMargin={12}
+                />
+                {group.units.map((unit, i) => (
+                  <YAxis
+                    key={unit}
+                    yAxisId={unit}
+                    orientation={i === 0 ? "left" : "right"}
+                    width={unit === "%" ? 40 : 58}
+                    tickFormatter={(v) =>
+                      Math.abs(v) >= 10000
+                        ? `${format(v / 1000)} tis.`
+                        : format(v, unit === "%" ? 1 : 0)
+                    }
+                    label={{
+                      value: unit,
+                      angle: -90,
+                      position: i === 0 ? "insideLeft" : "insideRight",
+                      fontSize: 10,
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                    fontSize={10}
+                    domain={["auto", "auto"]}
                   />
                 ))}
-              <Tooltip
-                content={({ active: visible, label }) => {
-                  if (!visible) return null;
-                  const time = Number(label);
-                  const term = premiers.findLastIndex((p) => p.time <= time);
-                  return (
-                    <div className="chart-tooltip">
-                      <strong>{date(time)}</strong>
-                      <p>
-                        {premiers[term]?.name} · {premiers[term]?.party}
-                      </p>
-                      {series.map((s) => {
-                        const point = s.points.find((p) => p.time === time);
-                        return (
-                          point && (
-                            <p key={s.title}>
-                              {s.title}:{" "}
-                              {format(
-                                point.value,
-                                s.id === "interest" ? 2 : s.unit === "%" ? 1 : 0,
-                              )}{" "}
-                              {s.unit}
-                            </p>
-                          )
-                        );
-                      })}
-                    </div>
-                  );
-                }}
-              />
-              {series.flatMap((s, i) =>
-                splitByTerm(s.points, s.id === "interest").map((points, term) => (
-                  <Line
-                    key={`${s.title}-${term}`}
-                    data={points}
-                    yAxisId={s.unit}
-                    name={s.title}
-                    type={s.id === "interest" ? "stepAfter" : "linear"}
-                    dataKey="value"
-                    stroke={partyColors[premiers[term].party]}
-                    strokeOpacity={active[term] ? 1 : 0.12}
-                    strokeDasharray={dashes[i]}
-                    strokeWidth={2.3}
-                    dot={false}
-                    activeDot={false}
-                    isAnimationActive={false}
-                  />
-                )),
-              )}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-      {group.ids.map((id) =>
-        errors[id] ? (
-          <div className="source-error" role="status" key={id}>
-            <span>
-              {metrics.find((m) => m.id === id)!.title}: Data se nepodařilo načíst. {errors[id]}
-            </span>
-            <button onClick={() => retry(id)}>Zkusit znovu ↻</button>
+                {premiers
+                  .filter((p) => p.time >= START)
+                  .map((p) => (
+                    <ReferenceLine
+                      key={p.start}
+                      yAxisId={group.units[0]}
+                      x={p.time}
+                      stroke={partyColors[p.party]}
+                      strokeOpacity={0.3}
+                      strokeDasharray="3 4"
+                    />
+                  ))}
+                <Tooltip
+                  content={({ active: visible, label }) => {
+                    if (!visible) return null;
+                    const time = Number(label);
+                    const term = premiers.findLastIndex((p) => p.time <= time);
+                    return (
+                      <div className="chart-tooltip">
+                        <strong>{date(time)}</strong>
+                        <p>
+                          {premiers[term]?.name} · {premiers[term]?.party}
+                        </p>
+                        {series.map((s) => {
+                          // The repo rate in force applies until the next change.
+                          const point =
+                            s.id === "interest"
+                              ? s.points.findLast((p) => p.time <= time)
+                              : s.points.find((p) => p.time === time);
+                          return (
+                            point && (
+                              <p key={s.title}>
+                                {s.title}:{" "}
+                                {format(
+                                  point.value,
+                                  s.id === "interest" ? 2 : s.unit === "%" ? 1 : 0,
+                                )}{" "}
+                                {s.unit}
+                              </p>
+                            )
+                          );
+                        })}
+                      </div>
+                    );
+                  }}
+                />
+                {series.flatMap((s, i) =>
+                  splitByTerm(s.points, s.id === "interest").map((points, term) => (
+                    <Line
+                      key={`${s.title}-${term}`}
+                      data={points}
+                      yAxisId={s.unit}
+                      name={s.title}
+                      type={s.id === "interest" ? "stepAfter" : "linear"}
+                      dataKey="value"
+                      stroke={partyColors[premiers[term].party]}
+                      strokeOpacity={active[term] ? 1 : 0.12}
+                      strokeDasharray={dashes[i]}
+                      strokeWidth={2.3}
+                      dot={false}
+                      activeDot={false}
+                      isAnimationActive={false}
+                    />
+                  )),
+                )}
+              </LineChart>
+            </ResponsiveContainer>
           </div>
-        ) : (
-          !results[id] && (
-            <p role="status" key={id}>
-              Načítáme {metrics.find((m) => m.id === id)!.title.toLocaleLowerCase("cs")} ze zdroje…
-            </p>
-          )
-        ),
-      )}
-      <details>
-        <summary>Co přesně graf ukazuje</summary>
-        {group.ids
-          .flatMap((id) => (id === "energy" ? [id, "gas" as const] : [id]))
-          .map((id) => {
-            const result = results[id === "gas" ? "energy" : id];
-            const metadata = result?.metadata[id];
+        )}
+        {group.ids.map((id) =>
+          errors[id] ? (
+            <div className="source-error" role="status" key={id}>
+              <span>
+                {metrics.find((m) => m.id === id)!.title}: Data se nepodařilo načíst. {errors[id]}
+              </span>
+              <button onClick={() => retry(id)}>Zkusit znovu ↻</button>
+            </div>
+          ) : (
+            !results[id] && (
+              <p role="status" key={id}>
+                Načítáme {metrics.find((m) => m.id === id)!.title.toLocaleLowerCase("cs")} ze
+                zdroje…
+              </p>
+            )
+          ),
+        )}
+      </div>
+      <div className="card-notes">
+        <details>
+          <summary>Co přesně graf ukazuje</summary>
+          {group.ids.map((id) => {
+            const result = results[id];
+            const metadata = result?.metadata;
             return (
               <section key={id} className="source-metadata">
-                <h3>{id === "gas" ? "Plyn" : metrics.find((m) => m.id === id)!.title}</h3>
+                <h3>{metrics.find((m) => m.id === id)!.title}</h3>
                 {metadata ? (
                   <>
                     {metadata.label && <p>{metadata.label}</p>}
@@ -349,17 +350,19 @@ function ComparisonCard({
               </section>
             );
           })}
-      </details>
-      {group.ids.includes("gdp") && (
-        <p className="calculation-note">
-          Vlastní výpočet aplikace: růst HDP = objemový index ČSÚ − 100.
-        </p>
-      )}
-      {group.ids.includes("gdpAbsolute") && (
-        <p className="calculation-note">
-          Vlastní převod aplikace: HDP v mld. Kč = údaj ČSÚ v mil. Kč ÷ 1 000.
-        </p>
-      )}
+        </details>
+        {group.ids.includes("gdp") && (
+          <p className="calculation-note">
+            Vlastní výpočet aplikace: růst HDP = objemový index ČSÚ − 100.
+          </p>
+        )}
+        {group.ids.includes("gdpAbsolute") && (
+          <p className="calculation-note">
+            Vlastní výpočet aplikace: HDP v mld. Kč = součet údajů ČSÚ za poslední 4 čtvrtletí v
+            mil. Kč ÷ 1 000.
+          </p>
+        )}
+      </div>
       <footer className="card-footer">
         {group.ids.map((id) => (
           <div key={id}>
@@ -368,16 +371,6 @@ function ComparisonCard({
               {metrics.find((m) => m.id === id)!.title} ↗
             </a>
             <DataFormatLinks id={id} />
-            {id === "energy" && (
-              <>
-                {" "}
-                ·{" "}
-                <a href={sourcePages.gas} target="_blank" rel="noreferrer">
-                  Plyn ↗
-                </a>
-                <DataFormatLinks id="gas" />
-              </>
-            )}
             <span>
               {results[id]
                 ? `Načteno: ${new Date(results[id]!.loaded).toLocaleString("cs-CZ")}`
@@ -393,43 +386,38 @@ function ComparisonCard({
 function App() {
   const [results, setResults] = useState<Results>({});
   const [errors, setErrors] = useState<Partial<Record<Metric, string>>>({});
-  const [attempts, setAttempts] = useState<Partial<Record<Metric, number>>>({});
   const [excludedTerms, setExcludedTerms] = useState<string[]>([]);
   const [excludedParties, setExcludedParties] = useState<Party[]>([]);
-  useEffect(() => {
-    const controllers = metrics
-      .filter((m) => !results[m.id])
-      .map((metric) => {
-        const controller = new AbortController();
-        const timeout = setTimeout(
-          () => controller.abort(new Error("Časový limit načítání vypršel.")),
-          45000,
-        );
-        loadMetric(metric.id, controller.signal)
-          .then((data) => {
-            if (!controller.signal.aborted) {
-              setResults((previous) => ({
-                ...previous,
-                [metric.id]: { ...data, loaded: Date.now() },
-              }));
-              setErrors((previous) => ({ ...previous, [metric.id]: undefined }));
-            }
-          })
-          .catch((error: Error) => {
-            if (controller.signal.reason !== "unmount")
-              setErrors((previous) => ({ ...previous, [metric.id]: error.message }));
-          })
-          .finally(() => clearTimeout(timeout));
-        return { controller, timeout };
-      });
-    return () =>
-      controllers.forEach(({ controller, timeout }) => {
+  // In-flight requests per source, so a retry never restarts other sources.
+  const requests = useRef(new Map<Metric, AbortController>());
+  const load = useCallback((id: Metric) => {
+    const controller = new AbortController();
+    requests.current.set(id, controller);
+    const timeout = setTimeout(
+      () => controller.abort(new Error("Časový limit načítání vypršel.")),
+      45000,
+    );
+    loadMetric(id, controller.signal)
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          setResults((previous) => ({ ...previous, [id]: { ...data, loaded: Date.now() } }));
+          setErrors((previous) => ({ ...previous, [id]: undefined }));
+        }
+      })
+      .catch((error: Error) => {
+        if (controller.signal.reason !== "unmount")
+          setErrors((previous) => ({ ...previous, [id]: error.message }));
+      })
+      .finally(() => {
         clearTimeout(timeout);
-        controller.abort("unmount");
+        if (requests.current.get(id) === controller) requests.current.delete(id);
       });
-    // Results are retained in component state; retries load only missing sources.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attempts]);
+  }, []);
+  useEffect(() => {
+    const inFlight = requests.current;
+    metrics.forEach((metric) => load(metric.id));
+    return () => inFlight.forEach((controller) => controller.abort("unmount"));
+  }, [load]);
   const active = premiers.map(
     (p) => !excludedTerms.includes(p.start) && !excludedParties.includes(p.party),
   );
@@ -441,18 +429,7 @@ function App() {
           <p className="intro-quote">
             „Ono se to nějak vyvrbí. Ještě nikdy nebylo, aby nějak nebylo.“ - Dobrý voják Švejk
           </p>
-          <p>
-            Devět ukazatelů. Jedna časová osa. Prohlédněte si vývoj české ekonomiky
-            <br className="desktop-break" /> a životní úrovně v kontextu jednotlivých vlád.
-          </p>
-          <div className="intro-bottom">
-            <span className="period">
-              <span>◷</span> 2010 — {date(END)}
-            </span>
-            <span className="live">
-              <i /> Živá data z veřejných zdrojů
-            </span>
-          </div>
+          <p>Prohlédněte si vývoj české ekonomiky v kontextu jednotlivých vlád.</p>
         </section>
         <section className="filters" aria-label="Filtry vlád a politických stran">
           <div className="filter-heading">
@@ -557,7 +534,7 @@ function App() {
               active={active}
               retry={(id) => {
                 setErrors((previous) => ({ ...previous, [id]: undefined }));
-                setAttempts((previous) => ({ ...previous, [id]: (previous[id] ?? 0) + 1 }));
+                load(id);
               }}
             />
           ))}
@@ -589,15 +566,17 @@ function App() {
           zabezpečení a Česká národní banka (ČNB).
         </p>
         <p>
-          <a
-            href="https://csu.gov.cz/podminky_pro_vyuzivani_a_dalsi_zverejnovani_statistickych_udaju_csu"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Podmínky užití dat ČSÚ ↗
-          </a>{" "}
-          · Tato aplikace není spojena s ČSÚ ani ostatními poskytovateli dat.
+          Podmínky užití dat:{" "}
+          {termsOfUse.map(([provider, href], i) => (
+            <span key={provider}>
+              {i > 0 && " · "}
+              <a href={href} target="_blank" rel="noreferrer">
+                {provider} ↗
+              </a>
+            </span>
+          ))}
         </p>
+        <p>Tato aplikace není spojena s ČSÚ ani ostatními poskytovateli dat.</p>
       </footer>
     </>
   );
