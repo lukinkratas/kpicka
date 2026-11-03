@@ -25,6 +25,3 @@ dist-ssr
 
 # Browser test artifacts
 test-results/
-.playwright-cli/
-*.state.json
-logged-in.json

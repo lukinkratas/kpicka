@@ -4,8 +4,6 @@
 
 **Target audience:** Czech people -> All text visible on frontend has to be written in czech.
 
-**Tools:** You should have playwright-cli and Chrome DevTools mcps available for app inpection.
-
 ### Český statistický úřad (ČSÚ)
 
 - **Attribution:** name ČSÚ as the data source, without implying that ČSÚ endorses you or your use of the data. 
