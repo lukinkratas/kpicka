@@ -46,7 +46,7 @@ csu
 #### Color pallete
 
 Use this color pallete: #6E6347 (RGB:110/99/71), #192C26 (RGB: 25/44/38), #52685D (RGB: 82/104/93), #A9BCAA (RGB: 169/188/170), #d19e61 (RGB: 209/158/97)
-*Note: Color pallete is `Dobrý voják Švejk` inspired.*
+*Note: Color pallete is `Osudy Dobrého vojáka Švejka za světové války` inspired.*
 
 ## 1. Think Before Coding
 
