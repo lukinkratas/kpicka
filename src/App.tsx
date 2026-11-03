@@ -21,6 +21,7 @@ import {
 } from "./data";
 import { partyColors, premiers, type Party } from "./premiers";
 import { splitByTerm } from "./chartData";
+import svejk from "./assets/svejk.webp";
 import "./App.css";
 
 const format = (n: number, digits = 0) =>
@@ -120,7 +121,6 @@ function ComparisonCard({
     <article className="metric-card" id={group.id}>
       <div className="card-heading">
         <div className="card-top">
-          <span className="eyebrow">ČESKÁ REPUBLIKA / SROVNÁNÍ</span>
           <span className="unit">2010 — {new Date(END).getUTCFullYear()}</span>
         </div>
         <h2>{group.title}</h2>
@@ -199,7 +199,7 @@ function ComparisonCard({
                   dataKey="time"
                   domain={[START, END]}
                   ticks={ticks}
-                  tickFormatter={(t) => String(new Date(t).getUTCFullYear()).slice(2)}
+                  tickFormatter={(t) => String(new Date(t).getUTCFullYear())}
                   tickLine={false}
                   axisLine={false}
                   fontSize={11}
@@ -430,6 +430,7 @@ function App() {
             „Ono se to nějak vyvrbí. Ještě nikdy nebylo, aby nějak nebylo.“ - Dobrý voják Švejk
           </p>
           <p>Prohlédněte si vývoj české ekonomiky v kontextu jednotlivých vlád.</p>
+          <img className="intro-art" src={svejk} alt="" width={560} height={613} />
         </section>
         <section className="filters" aria-label="Filtry vlád a politických stran">
           <div className="filter-heading">
