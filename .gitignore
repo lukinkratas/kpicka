@@ -18,6 +18,7 @@ terraform.rc
 
 node_modules/
 dist/
+dist-worker/
 
 # playwright
 test-results/

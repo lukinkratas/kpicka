@@ -64,8 +64,7 @@ const termsOfUse = [
     "https://www.cnb.cz/cs/ochrana-osobnich-udaju-a-pravni-ujednani/podminky-uzivani-internetovych-stranek-cnb/",
   ],
 ];
-type Result = MetricData & { loaded: number };
-type Results = Partial<Record<Metric, Result>>;
+type Results = Partial<Record<Metric, MetricData>>;
 
 function DataFormatLinks({ id }: { id: Metric }) {
   const title = metrics.find((m) => m.id === id)!.title;
@@ -442,7 +441,7 @@ function ComparisonCard({
             <DataFormatLinks id={id} />
             <span>
               {results[id]
-                ? `Načteno: ${new Date(results[id]!.loaded).toLocaleString("cs-CZ")}`
+                ? `Staženo ze zdroje: ${new Date(results[id]!.loaded).toLocaleString("cs-CZ")}`
                 : "Zatím bez platného načtení"}
             </span>
           </div>
@@ -469,7 +468,7 @@ function App() {
     loadMetric(id, controller.signal)
       .then((data) => {
         if (!controller.signal.aborted) {
-          setResults((previous) => ({ ...previous, [id]: { ...data, loaded: Date.now() } }));
+          setResults((previous) => ({ ...previous, [id]: data }));
           setErrors((previous) => ({ ...previous, [id]: undefined }));
         }
       })
@@ -611,9 +610,10 @@ function App() {
         <section className="about" id="zdroje">
           <h2>Veřejná data. Otevřený kontext.</h2>
           <p>
-            Grafy načítáme přímo z veřejných zdrojů při otevření stránky, bez ukládání do cache.
-            Každý ukazatel má vlastní četnost a datum posledního pozorování. Prázdná část grafu
-            znamená, že použitý zdroj pro dané období neposkytuje data.
+            Data z veřejných zdrojů stahujeme jednou denně a ukládáme do vlastní cache. U každého
+            ukazatele uvádíme čas posledního úspěšného stažení; každý má vlastní četnost a datum
+            posledního pozorování. Prázdná část grafu znamená, že použitý zdroj pro dané období
+            neposkytuje data.
           </p>
           <p>
             Portréty premiérů pocházejí z hlavních obrázků české Wikipedie. Informace o obrázcích a

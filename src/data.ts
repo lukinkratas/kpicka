@@ -160,10 +160,15 @@ export function readMetadata(json: JsonStat, rows: Row[]): SourceMetadata {
   }
   return { label: json.label, fields, notes: [...new Set(notes.filter((s): s is string => !!s?.trim()))] }
 }
-export type MetricData = { points: Point[]; metadata?: SourceMetadata }
-export async function loadMetric(id: Metric, signal: AbortSignal): Promise<MetricData> {
+export type MetricData = { points: Point[]; metadata?: SourceMetadata; loaded: number }
+// ČSÚ serves JSON-stat metadata at the same endpoint without the format parameter.
+export function metadataUrl(id: Metric): string | undefined {
   const url = new URL(sources[id])
-  const isCsu = url.host === 'data.csu.gov.cz'
+  return url.host === 'data.csu.gov.cz' ? url.origin + url.pathname : undefined
+}
+// Sources are downloaded daily by the cron worker and served from our R2 cache (functions/api).
+export async function loadMetric(id: Metric, signal: AbortSignal): Promise<MetricData> {
+  const isCsu = metadataUrl(id) !== undefined
   async function request(target: string) {
     const response = await fetch(target, { signal, cache: 'no-store' }).catch(error => {
       throw signal.aborted ? error : new Error('Zdroj dat je nedostupný (chyba sítě).')
@@ -173,8 +178,8 @@ export async function loadMetric(id: Metric, signal: AbortSignal): Promise<Metri
   }
   // A metadata outage must not hide otherwise available observations.
   const [response, json] = await Promise.all([
-    request(url.href),
-    isCsu ? request(url.origin + url.pathname).then(r => r.json() as Promise<JsonStat>).catch(() => null) : null,
+    request(`/api/data/${id}`),
+    isCsu ? request(`/api/metadata/${id}`).then(r => r.json() as Promise<JsonStat>).catch(() => null) : null,
   ])
   const text = new TextDecoder(id === 'debt' ? 'windows-1250' : 'utf-8').decode(await response.arrayBuffer())
   const rows = id === 'interest' ? [] : parseCsv(text)
@@ -192,5 +197,6 @@ export async function loadMetric(id: Metric, signal: AbortSignal): Promise<Metri
     }
     metadata = { fields, notes: [] }
   }
-  return { points: id === 'interest' ? parseInterest(text) : selectPoints(id, rows), metadata }
+  const loaded = Date.parse(response.headers.get('Last-Modified')!)
+  return { points: id === 'interest' ? parseInterest(text) : selectPoints(id, rows), metadata, loaded }
 }
