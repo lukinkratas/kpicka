@@ -20,11 +20,11 @@ npm test
 ### Target architecture
 
 - Cache the data in our infra rather than proxying every user request to the ČSÚ API. This protects from outages and keeps a polite API consumer.
-- Prototype will be done with proxy API calls.
+- A daily cron Worker (`etl/`) copies every source into R2; the dashboard reads it through a Pages Function (`functions/api/`). In `npm run dev`, the Vite proxy serves the same `/api/<host><path>` route live from the sources.
 
  ┌──────────┐  cron/daily   ┌─────────────┐      ┌──────────┐
- │ ČSÚ API  │ ───────────▶  │ ETL (Python)│ ───▶ │ DB /     │
- │ DataStat │ CSV/JSON-STAT └─────────────┘      │ S3 cache │
+ │ ČSÚ API  │ ───────────▶  │ ETL (Worker)│ ───▶ │ R2       │
+ │ DataStat │ CSV/JSON-STAT └─────────────┘      │ bucket   │
  └──────────┘                                    └─────┬────┘
                                                        │
                                               ┌────────▼──────────┐

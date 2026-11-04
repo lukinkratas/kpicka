@@ -25,7 +25,8 @@ terraform {
   }
 }
 
-# Auth: export CLOUDFLARE_API_TOKEN (permission: Account > Cloudflare Pages > Edit)
+# Auth: export CLOUDFLARE_API_TOKEN (permissions: Account > Cloudflare Pages > Edit,
+# Account > Workers Scripts > Edit, Account > Workers R2 Storage > Edit)
 provider "cloudflare" {}
 
 resource "cloudflare_pages_project" "site" {
@@ -49,4 +50,42 @@ resource "cloudflare_pages_project" "site" {
       preview_deployment_setting     = "none"
     }
   }
+
+  # The Pages Function (functions/api/[[path]].ts) reads the cron's copies from R2.
+  deployment_configs = {
+    production = {
+      compatibility_date = "2026-11-01"
+      r2_buckets = {
+        DATA = { name = cloudflare_r2_bucket.data.name }
+      }
+    }
+  }
+}
+
+# Daily copies of every data source, written by the ETL Worker below.
+resource "cloudflare_r2_bucket" "data" {
+  account_id = var.account_id
+  name       = "${var.project_name}-data"
+}
+
+# Bundle first: npm run build:etl (etl/worker.ts -> etl/dist/worker.js).
+resource "cloudflare_workers_script" "etl" {
+  account_id         = var.account_id
+  script_name        = "${var.project_name}-etl"
+  main_module        = "worker.js"
+  content_file       = "${path.module}/../etl/dist/worker.js"
+  content_sha256     = filesha256("${path.module}/../etl/dist/worker.js")
+  compatibility_date = "2026-11-01"
+
+  bindings = [{
+    type        = "r2_bucket"
+    name        = "DATA"
+    bucket_name = cloudflare_r2_bucket.data.name
+  }]
+}
+
+resource "cloudflare_workers_cron_trigger" "etl" {
+  account_id  = var.account_id
+  script_name = cloudflare_workers_script.etl.script_name
+  schedules   = [{ cron = "0 4 * * *" }] # daily 04:00 UTC
 }

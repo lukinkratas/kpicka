@@ -160,12 +160,13 @@ export function readMetadata(json: JsonStat, rows: Row[]): SourceMetadata {
   }
   return { label: json.label, fields, notes: [...new Set(notes.filter((s): s is string => !!s?.trim()))] }
 }
-export type MetricData = { points: Point[]; metadata?: SourceMetadata }
+// `loaded` is when the data was fetched from the source: the cron run time from Last-Modified, else now.
+export type MetricData = { points: Point[]; metadata?: SourceMetadata; loaded: number }
 export async function loadMetric(id: Metric, signal: AbortSignal): Promise<MetricData> {
   const url = new URL(sources[id])
   const isCsu = url.host === 'data.csu.gov.cz'
-  const prefix = isCsu ? '/api/csu' : url.host === 'data.mf.gov.cz' ? '/api/mf' : url.host === 'www.cnb.cz' ? '/api/cnb' : '/api/cssz'
-  const path = prefix + url.pathname
+  // The Pages Function serves the cron's R2 copy; in dev the Vite proxy forwards the same route to the source.
+  const path = '/api/' + url.host + url.pathname
   async function request(query: string) {
     const response = await fetch(path + query, { signal, cache: 'no-store' }).catch(error => {
       throw signal.aborted ? error : new Error('Zdroj dat je nedostupný (chyba sítě).')
@@ -194,5 +195,6 @@ export async function loadMetric(id: Metric, signal: AbortSignal): Promise<Metri
     }
     metadata = { fields, notes: [] }
   }
-  return { points: id === 'interest' ? parseInterest(text) : selectPoints(id, rows), metadata }
+  const loaded = Date.parse(response.headers.get('last-modified') ?? '') || Date.now()
+  return { points: id === 'interest' ? parseInterest(text) : selectPoints(id, rows), metadata, loaded }
 }

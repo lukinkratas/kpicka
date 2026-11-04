@@ -13,5 +13,6 @@ fmtchk:
 	terraform fmt -check infra/
 
 deploy:
+	npm run build:etl && \
 	set -a && . ./.env && set +a && \
 	terraform -chdir=infra/ apply

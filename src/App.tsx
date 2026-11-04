@@ -64,8 +64,7 @@ const termsOfUse = [
     "https://www.cnb.cz/cs/ochrana-osobnich-udaju-a-pravni-ujednani/podminky-uzivani-internetovych-stranek-cnb/",
   ],
 ];
-type Result = MetricData & { loaded: number };
-type Results = Partial<Record<Metric, Result>>;
+type Results = Partial<Record<Metric, MetricData>>;
 
 function DataFormatLinks({ id }: { id: Metric }) {
   const title = metrics.find((m) => m.id === id)!.title;
@@ -469,7 +468,7 @@ function App() {
     loadMetric(id, controller.signal)
       .then((data) => {
         if (!controller.signal.aborted) {
-          setResults((previous) => ({ ...previous, [id]: { ...data, loaded: Date.now() } }));
+          setResults((previous) => ({ ...previous, [id]: data }));
           setErrors((previous) => ({ ...previous, [id]: undefined }));
         }
       })
