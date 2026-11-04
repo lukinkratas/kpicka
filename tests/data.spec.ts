@@ -51,14 +51,40 @@ test('keeps observations when metadata is malformed and reports network failures
   const original = globalThis.fetch
   const csv = 'Ukazatel,Pohlaví,Území,Roky,Hodnota\nMedián měsíčních mezd (Kč),Celkem,Česko,2024,41742\n'
   try {
-    const lastModified = 'Wed, 04 Nov 2026 05:00:00 GMT'
-    globalThis.fetch = async input => String(input) === '/api/data/wages' ? new Response(csv, { headers: { 'Last-Modified': lastModified } }) : Response.json({})
+    globalThis.fetch = async input => String(input).includes('format=CSV') ? new Response(csv) : Response.json({})
     const data = await loadMetric('wages', new AbortController().signal)
     expect(data.points).toHaveLength(1)
     expect(data.metadata).toBeUndefined()
-    expect(data.loaded).toBe(Date.parse(lastModified))
     globalThis.fetch = async () => { throw new TypeError('Failed to fetch') }
     await expect(loadMetric('wages', new AbortController().signal)).rejects.toThrow('chyba sítě')
+  } finally {
+    globalThis.fetch = original
+  }
+})
+
+test('fetches ČSÚ directly, falls back to the R2 copy, and reads other sources only from R2', async () => {
+  const original = globalThis.fetch
+  const csv = 'Ukazatel,Pohlaví,Území,Roky,Hodnota\nMedián měsíčních mezd (Kč),Celkem,Česko,2024,41742\n'
+  const lastModified = 'Wed, 04 Nov 2026 05:00:00 GMT'
+  const cached = (body: string) => new Response(body, { headers: { 'Last-Modified': lastModified } })
+  const requested: string[] = []
+  try {
+    globalThis.fetch = async input => { requested.push(String(input)); return String(input).includes('data.csu.gov.cz') ? new Response(csv) : cached(csv) }
+    const before = Date.now()
+    expect((await loadMetric('wages', new AbortController().signal)).loaded).toBeGreaterThanOrEqual(before)
+    expect(requested.every(url => url.startsWith('https://data.csu.gov.cz/'))).toBe(true)
+
+    requested.length = 0
+    globalThis.fetch = async input => { requested.push(String(input)); return String(input).startsWith('/api/') ? cached(csv) : new Response('', { status: 503 }) }
+    const data = await loadMetric('wages', new AbortController().signal)
+    expect(data.points).toHaveLength(1)
+    expect(data.loaded).toBe(Date.parse(lastModified))
+    expect(requested).toEqual(expect.arrayContaining(['/api/data/wages', '/api/metadata/wages']))
+
+    requested.length = 0
+    globalThis.fetch = async input => { requested.push(String(input)); return cached('rok,dluh\n2024,"3 000,0"\n') }
+    await loadMetric('debt', new AbortController().signal)
+    expect(requested).toEqual(['/api/data/debt'])
   } finally {
     globalThis.fetch = original
   }

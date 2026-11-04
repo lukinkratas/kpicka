@@ -166,9 +166,12 @@ export function metadataUrl(id: Metric): string | undefined {
   const url = new URL(sources[id])
   return url.host === 'data.csu.gov.cz' ? url.origin + url.pathname : undefined
 }
-// Sources are downloaded daily by the cron worker and served from our R2 cache (functions/api).
+// ČSÚ and ČSSZ allow browser requests, so they are fetched directly. Our R2 copy (downloaded daily
+// by the cron worker, served by functions/api) is their fallback and the only path for the others.
+const directHosts = ['data.csu.gov.cz', 'data.cssz.cz']
 export async function loadMetric(id: Metric, signal: AbortSignal): Promise<MetricData> {
-  const isCsu = metadataUrl(id) !== undefined
+  const metaUrl = metadataUrl(id)
+  const isCsu = metaUrl !== undefined
   async function request(target: string) {
     const response = await fetch(target, { signal, cache: 'no-store' }).catch(error => {
       throw signal.aborted ? error : new Error('Zdroj dat je nedostupný (chyba sítě).')
@@ -176,10 +179,18 @@ export async function loadMetric(id: Metric, signal: AbortSignal): Promise<Metri
     if (!response.ok) throw new Error(`Zdroj dat je nedostupný (HTTP ${response.status}).`)
     return response
   }
+  async function load(direct: string, cached: string) {
+    if (directHosts.includes(new URL(direct).host)) {
+      try { return { response: await request(direct), loaded: Date.now() } }
+      catch (error) { if (signal.aborted) throw error }
+    }
+    const response = await request(cached)
+    return { response, loaded: Date.parse(response.headers.get('Last-Modified')!) }
+  }
   // A metadata outage must not hide otherwise available observations.
-  const [response, json] = await Promise.all([
-    request(`/api/data/${id}`),
-    isCsu ? request(`/api/metadata/${id}`).then(r => r.json() as Promise<JsonStat>).catch(() => null) : null,
+  const [{ response, loaded }, json] = await Promise.all([
+    load(sources[id], `/api/data/${id}`),
+    isCsu ? load(metaUrl, `/api/metadata/${id}`).then(r => r.response.json() as Promise<JsonStat>).catch(() => null) : null,
   ])
   const text = new TextDecoder(id === 'debt' ? 'windows-1250' : 'utf-8').decode(await response.arrayBuffer())
   const rows = id === 'interest' ? [] : parseCsv(text)
@@ -197,6 +208,5 @@ export async function loadMetric(id: Metric, signal: AbortSignal): Promise<Metri
     }
     metadata = { fields, notes: [] }
   }
-  const loaded = Date.parse(response.headers.get('Last-Modified')!)
   return { points: id === 'interest' ? parseInterest(text) : selectPoints(id, rows), metadata, loaded }
 }

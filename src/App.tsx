@@ -610,10 +610,11 @@ function App() {
         <section className="about" id="zdroje">
           <h2>Veřejná data. Otevřený kontext.</h2>
           <p>
-            Data z veřejných zdrojů stahujeme jednou denně a ukládáme do vlastní cache. U každého
-            ukazatele uvádíme čas posledního úspěšného stažení; každý má vlastní četnost a datum
-            posledního pozorování. Prázdná část grafu znamená, že použitý zdroj pro dané období
-            neposkytuje data.
+            Data ČSÚ a ČSSZ načítáme přímo ze zdroje při otevření stránky. Ostatní zdroje a záložní
+            kopii pro případ výpadku stahujeme jednou denně do vlastní cache. U každého ukazatele
+            uvádíme čas posledního úspěšného stažení; každý má vlastní četnost a datum posledního
+            pozorování. Prázdná část grafu znamená, že použitý zdroj pro dané období neposkytuje
+            data.
           </p>
           <p>
             Portréty premiérů pocházejí z hlavních obrázků české Wikipedie. Informace o obrázcích a

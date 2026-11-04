@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test'
 
+// Fails inflation both at ČSÚ and in the R2 fallback.
+const inflation = (url: URL) => url.pathname.endsWith('/CEN0101HT02') || url.pathname === '/api/data/inflation'
+
 test('loads all live series with the common 2010–today axis', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
@@ -33,24 +36,24 @@ test('loads all live series with the common 2010–today axis', async ({ page })
 })
 
 test('offers a retry after a failed source request', async ({ page }) => {
-  await page.route('**/api/data/inflation', route => route.fulfill({ status: 503, body: 'Unavailable' }))
+  await page.route(inflation, route => route.fulfill({ status: 503, body: 'Unavailable' }))
   await page.goto('http://127.0.0.1:5173')
   const card = page.locator('#income')
   await expect(card.getByText('Data se nepodařilo načíst.')).toBeVisible()
   await expect(card.locator('.card-footer>div').first().getByText('Zatím bez platného načtení')).toBeVisible()
-  await page.unroute('**/api/data/inflation')
+  await page.unroute(inflation)
   await card.getByRole('button', { name: 'Zkusit znovu' }).click()
   await expect(card.locator('.card-footer>div').first()).toContainText('Staženo ze zdroje:', { timeout: 60000 })
   await expect(card.getByText('Data se nepodařilo načíst.', { exact: false })).toHaveCount(0)
 })
 
 test('retrying one source does not restart other in-flight sources', async ({ page }) => {
-  await page.route('**/api/data/inflation', route => route.fulfill({ status: 503, body: 'Unavailable' }))
+  await page.route(inflation, route => route.fulfill({ status: 503, body: 'Unavailable' }))
   // Hold the wage observations until after the retry.
   let release = () => {}
   const held = new Promise<void>(resolve => { release = resolve })
   let retried = false, wageRequestsAfterRetry = 0
-  await page.route('**/api/data/wages', async route => {
+  await page.route(url => url.pathname.endsWith('/ZAMG08T1') && url.search === '?format=CSV', async route => {
     if (retried) wageRequestsAfterRetry++
     await held
     await route.continue().catch(() => {})
@@ -85,7 +88,7 @@ test('combines term and party filters and retains the full time axis', async ({ 
 
 
 test('shows live API metadata verbatim in chart details', async ({ page }) => {
-  await page.route('**/api/metadata/inflation', async route => {
+  await page.route('https://data.csu.gov.cz/**CEN0101HT02', async route => {
     const response = await route.fetch()
     const json = await response.json()
     json.label = 'Ověřený název přímo z API'
