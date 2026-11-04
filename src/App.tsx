@@ -8,6 +8,8 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  usePlotArea,
+  useXAxisScale,
 } from "recharts";
 import {
   END,
@@ -94,6 +96,40 @@ function DataFormatLinks({ id }: { id: Metric }) {
         CSV ↗
       </a>
     </>
+  );
+}
+
+// Premier portraits above the plot area, centered on each term.
+function PremierAvatars({ chartId, active }: { chartId: string; active: boolean[] }) {
+  const scale = useXAxisScale();
+  const plot = usePlotArea();
+  if (!scale || !plot) return null;
+  const r = 11;
+  return (
+    <g aria-hidden="true">
+      {premiers.map((p, i) => {
+        const x = (scale(Math.max(START, p.time))! + scale(premiers[i + 1]?.time ?? END)!) / 2;
+        const y = plot.y - r - 6;
+        const clip = `avatar-${chartId}-${i}`;
+        return (
+          <g key={p.start} opacity={active[i] ? 1 : 0.3}>
+            <clipPath id={clip}>
+              <circle cx={x} cy={y} r={r} />
+            </clipPath>
+            <image
+              href={p.image}
+              x={x - r}
+              y={y - r}
+              width={r * 2}
+              height={r * 2}
+              preserveAspectRatio="xMidYMin slice"
+              clipPath={`url(#${clip})`}
+            />
+            <circle cx={x} cy={y} r={r} fill="none" stroke={partyColors[p.party]} strokeWidth={2} />
+          </g>
+        );
+      })}
+    </g>
   );
 }
 
@@ -188,7 +224,7 @@ function ComparisonCard({
             aria-label={`${group.title}, od 1. ledna 2010 do ${date(END)}`}
           >
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={chartData} margin={{ left: 0, right: 0, top: 12, bottom: 0 }}>
+              <LineChart data={chartData} margin={{ left: 0, right: 0, top: 36, bottom: 0 }}>
                 <CartesianGrid
                   vertical={false}
                   stroke="var(--color-chart-grid)"
@@ -240,6 +276,7 @@ function ComparisonCard({
                       strokeDasharray="3 4"
                     />
                   ))}
+                <PremierAvatars chartId={group.id} active={active} />
                 <Tooltip
                   content={({ active: visible, label }) => {
                     if (!visible) return null;
