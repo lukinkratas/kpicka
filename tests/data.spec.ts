@@ -51,10 +51,12 @@ test('keeps observations when metadata is malformed and reports network failures
   const original = globalThis.fetch
   const csv = 'Ukazatel,Pohlaví,Území,Roky,Hodnota\nMedián měsíčních mezd (Kč),Celkem,Česko,2024,41742\n'
   try {
-    globalThis.fetch = async input => String(input).includes('format=CSV') ? new Response(csv) : Response.json({})
+    const lastModified = 'Wed, 04 Nov 2026 05:00:00 GMT'
+    globalThis.fetch = async input => String(input) === '/api/data/wages' ? new Response(csv, { headers: { 'Last-Modified': lastModified } }) : Response.json({})
     const data = await loadMetric('wages', new AbortController().signal)
     expect(data.points).toHaveLength(1)
     expect(data.metadata).toBeUndefined()
+    expect(data.loaded).toBe(Date.parse(lastModified))
     globalThis.fetch = async () => { throw new TypeError('Failed to fetch') }
     await expect(loadMetric('wages', new AbortController().signal)).rejects.toThrow('chyba sítě')
   } finally {
