@@ -164,10 +164,8 @@ export type MetricData = { points: Point[]; metadata?: SourceMetadata }
 export async function loadMetric(id: Metric, signal: AbortSignal): Promise<MetricData> {
   const url = new URL(sources[id])
   const isCsu = url.host === 'data.csu.gov.cz'
-  const prefix = isCsu ? '/api/csu' : url.host === 'data.mf.gov.cz' ? '/api/mf' : url.host === 'www.cnb.cz' ? '/api/cnb' : '/api/cssz'
-  const path = prefix + url.pathname
-  async function request(query: string) {
-    const response = await fetch(path + query, { signal, cache: 'no-store' }).catch(error => {
+  async function request(target: string) {
+    const response = await fetch(target, { signal, cache: 'no-store' }).catch(error => {
       throw signal.aborted ? error : new Error('Zdroj dat je nedostupný (chyba sítě).')
     })
     if (!response.ok) throw new Error(`Zdroj dat je nedostupný (HTTP ${response.status}).`)
@@ -175,8 +173,8 @@ export async function loadMetric(id: Metric, signal: AbortSignal): Promise<Metri
   }
   // A metadata outage must not hide otherwise available observations.
   const [response, json] = await Promise.all([
-    request(url.search),
-    isCsu ? request('').then(r => r.json() as Promise<JsonStat>).catch(() => null) : null,
+    request(url.href),
+    isCsu ? request(url.origin + url.pathname).then(r => r.json() as Promise<JsonStat>).catch(() => null) : null,
   ])
   const text = new TextDecoder(id === 'debt' ? 'windows-1250' : 'utf-8').decode(await response.arrayBuffer())
   const rows = id === 'interest' ? [] : parseCsv(text)
