@@ -100,7 +100,16 @@ function DataFormatLinks({ id }: { id: Metric }) {
 }
 
 // Premier portraits above the plot area, centered on each term.
-function PremierAvatars({ chartId, active }: { chartId: string; active: boolean[] }) {
+// Clicking a portrait toggles the same global term filter as the timeline.
+function PremierAvatars({
+  chartId,
+  active,
+  toggleTerm,
+}: {
+  chartId: string;
+  active: boolean[];
+  toggleTerm: (start: string) => void;
+}) {
   const scale = useXAxisScale();
   const plot = usePlotArea();
   if (!scale || !plot) return null;
@@ -109,10 +118,18 @@ function PremierAvatars({ chartId, active }: { chartId: string; active: boolean[
     <g aria-hidden="true">
       {premiers.map((p, i) => {
         const x = (scale(Math.max(START, p.time))! + scale(premiers[i + 1]?.time ?? END)!) / 2;
+        // The scale is not ready on the first render.
+        if (!Number.isFinite(x)) return null;
         const y = plot.y - r - 6;
         const clip = `avatar-${chartId}-${i}`;
         return (
-          <g key={p.start} opacity={active[i] ? 1 : 0.3}>
+          <g
+            key={p.start}
+            opacity={active[i] ? 1 : 0.3}
+            style={{ cursor: "pointer" }}
+            onClick={() => toggleTerm(p.start)}
+          >
+            <title>{`${p.name} · ${p.party} · kliknutím zapnete nebo ztlumíte období`}</title>
             <clipPath id={clip}>
               <circle cx={x} cy={y} r={r} />
             </clipPath>
@@ -139,13 +156,17 @@ function ComparisonCard({
   errors,
   retry,
   active,
+  toggleTerm,
 }: {
   group: (typeof groups)[number];
   results: Results;
   errors: Partial<Record<Metric, string>>;
   retry: (id: Metric) => void;
   active: boolean[];
+  toggleTerm: (start: string) => void;
 }) {
+  // Series muted in this chart only; they stay plotted so axes do not rescale.
+  const [hiddenSeries, setHiddenSeries] = useState<Metric[]>([]);
   const series = group.ids.map((id) => ({
     ...metrics.find((m) => m.id === id)!,
     points: results[id]?.points ?? [],
@@ -200,7 +221,18 @@ function ComparisonCard({
       </div>
       <div className="legend" aria-label="Legenda ukazatelů">
         {series.map((s, i) => (
-          <span key={s.title}>
+          <button
+            key={s.title}
+            aria-pressed={!hiddenSeries.includes(s.id)}
+            className={hiddenSeries.includes(s.id) ? "faded" : ""}
+            onClick={() =>
+              setHiddenSeries((previous) =>
+                previous.includes(s.id)
+                  ? previous.filter((id) => id !== s.id)
+                  : [...previous, s.id],
+              )
+            }
+          >
             <svg width="30" height="10" aria-hidden="true">
               <line
                 x1="0"
@@ -213,7 +245,7 @@ function ComparisonCard({
               />
             </svg>
             {s.title} ({s.unit})
-          </span>
+          </button>
         ))}
       </div>
       <div className="card-chart">
@@ -276,7 +308,7 @@ function ComparisonCard({
                       strokeDasharray="3 4"
                     />
                   ))}
-                <PremierAvatars chartId={group.id} active={active} />
+                <PremierAvatars chartId={group.id} active={active} toggleTerm={toggleTerm} />
                 <Tooltip
                   content={({ active: visible, label }) => {
                     if (!visible) return null;
@@ -321,7 +353,7 @@ function ComparisonCard({
                       type={s.id === "interest" ? "stepAfter" : "linear"}
                       dataKey="value"
                       stroke={partyColors[premiers[term].party]}
-                      strokeOpacity={active[term] ? 1 : 0.12}
+                      strokeOpacity={active[term] && !hiddenSeries.includes(s.id) ? 1 : 0.12}
                       strokeDasharray={dashes[i]}
                       strokeWidth={2.3}
                       dot={false}
@@ -455,6 +487,10 @@ function App() {
     metrics.forEach((metric) => load(metric.id));
     return () => inFlight.forEach((controller) => controller.abort("unmount"));
   }, [load]);
+  const toggleTerm = (start: string) =>
+    setExcludedTerms((previous) =>
+      previous.includes(start) ? previous.filter((t) => t !== start) : [...previous, start],
+    );
   const active = premiers.map(
     (p) => !excludedTerms.includes(p.start) && !excludedParties.includes(p.party),
   );
@@ -502,15 +538,9 @@ function App() {
                       width: `${((end - start) / (END - START)) * 100}%`,
                       borderColor: partyColors[p.party],
                     }}
-                    onClick={() =>
-                      setExcludedTerms((previous) =>
-                        previous.includes(p.start)
-                          ? previous.filter((t) => t !== p.start)
-                          : [...previous, p.start],
-                      )
-                    }
+                    onClick={() => toggleTerm(p.start)}
                   >
-                    <img src={p.image} alt={p.name} />
+                    <img src={p.image} alt={p.name} style={{ borderColor: partyColors[p.party] }} />
                     <span>{p.name}</span>
                     <small>{p.party}</small>
                   </button>
@@ -570,6 +600,7 @@ function App() {
               results={results}
               errors={errors}
               active={active}
+              toggleTerm={toggleTerm}
               retry={(id) => {
                 setErrors((previous) => ({ ...previous, [id]: undefined }));
                 load(id);

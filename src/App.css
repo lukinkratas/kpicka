@@ -504,10 +504,14 @@ h1 span {
   font-weight: 400;
   letter-spacing: 0;
 }
-.legend span {
+.legend button {
   display: flex;
   align-items: center;
   gap: 6px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
 }
 .chart-tooltip {
   background: var(--color-surface);
