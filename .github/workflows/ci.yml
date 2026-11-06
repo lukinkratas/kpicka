@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+    paths:
+      - "infra/**"
+
+permissions:
+  contents: read
+
+jobs:
+  test-dev:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+
+      - name: Format check
+        run: make fmtchk
