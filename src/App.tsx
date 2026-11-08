@@ -33,7 +33,7 @@ const ticks = Array.from(
   { length: Math.floor((new Date(END).getUTCFullYear() - 2010) / 2) + 1 },
   (_, i) => Date.UTC(2010 + i * 2, 0, 1),
 );
-const groups: { id: string; title: string; ids: Metric[]; units: string[] }[] = [
+const groups: { id: string; title: string; subtitle?: string; ids: Metric[]; units: string[] }[] = [
   {
     id: "income",
     title: "Inflace, mzdy a důchody",
@@ -41,16 +41,45 @@ const groups: { id: string; title: string; ids: Metric[]; units: string[] }[] = 
     units: ["%", "Kč"],
   },
   {
-    id: "prices",
-    title: "Inflace, energie a bydlení",
-    ids: ["inflation", "energy", "gas", "housing"],
-    units: ["%", "Kč/MWh", "Kč/m²"],
+    id: "energy",
+    title: "Energie",
+    subtitle: "Ceníkové ceny elektřiny a plynu pro domácnosti · Kč/MWh",
+    ids: ["energy", "gas"],
+    units: ["Kč/MWh"],
   },
-  { id: "debt", title: "Státní dluh a HDP", ids: ["debt", "gdpAbsolute"], units: ["mld. Kč"] },
   {
-    id: "employment",
-    title: "Nezaměstnanost a růst HDP",
-    ids: ["unemployment", "gdp", "interest", "inflation"],
+    id: "housing",
+    title: "Bydlení",
+    subtitle: "Průměrná kupní cena bytů v Česku · Kč/m²",
+    ids: ["housing"],
+    units: ["Kč/m²"],
+  },
+  {
+    id: "debt",
+    title: "Státní dluh a HDP",
+    subtitle: "Stav dluhu a HDP za poslední 4 čtvrtletí v běžných cenách · mld. Kč",
+    ids: ["debt", "gdpAbsolute"],
+    units: ["mld. Kč"],
+  },
+  {
+    id: "rates",
+    title: "Úroková sazba a inflace",
+    subtitle: "2T repo sazba ČNB a meziroční inflace · %",
+    ids: ["interest", "inflation"],
+    units: ["%"],
+  },
+  {
+    id: "unemployment",
+    title: "Nezaměstnanost",
+    subtitle: "Obecná míra nezaměstnanosti · %",
+    ids: ["unemployment"],
+    units: ["%"],
+  },
+  {
+    id: "gdp",
+    title: "Růst HDP",
+    subtitle: "Meziroční reálný růst HDP · sezonně očištěno · %",
+    ids: ["gdp"],
     units: ["%"],
   },
 ];
@@ -183,9 +212,7 @@ function ComparisonCard({
         <p className="subtitle">
           {group.units.length > 1
             ? "Různé jednotky mají samostatné osy. Výšky křivek nelze přímo porovnávat."
-            : group.id === "debt"
-              ? "Stav dluhu a HDP za poslední 4 čtvrtletí v běžných cenách · mld. Kč"
-              : "Nezaměstnanost, růst HDP, 2T repo sazba ČNB a inflace · %"}
+            : group.subtitle}
         </p>
       </div>
       <div className="series-readings">
@@ -292,7 +319,7 @@ function ComparisonCard({
                     axisLine={false}
                     tickLine={false}
                     fontSize={10}
-                    domain={["auto", "auto"]}
+                    domain={group.id === "housing" ? [0, "auto"] : ["auto", "auto"]}
                   />
                 ))}
                 {premiers
