@@ -2,9 +2,9 @@
 
 Dashboard app for politics KPIs in the Czech Republic.
 
-  - **Tech Stack:** Typescript React + Recharts
+  - **Tech Stack:** TypeScript + React + Vite + Tailwind CSS + Recharts, Cloudflare (Pages, Pages Functions, Worker on cron, R2), Terraform, Playwright
 
-**Backend:** CSU public API
+  - **Backend:** public APIs of ČSÚ, ČSSZ, ČNB and MF (cached in R2)
 
 ```sh
 npm install
