@@ -24,7 +24,6 @@ import {
 import { partyColors, premiers, type Party } from "./premiers";
 import { splitByTerm } from "./chartData";
 import svejk from "./assets/svejk.webp";
-import "./App.css";
 
 const format = (n: number, digits = 0) =>
   new Intl.NumberFormat("cs-CZ", { maximumFractionDigits: digits }).format(n);
@@ -203,24 +202,32 @@ function ComparisonCard({
     .sort((a, b) => a - b)
     .map((time) => ({ time }));
   return (
-    <article className="metric-card" id={group.id}>
-      <div className="card-heading">
-        <div className="card-top">
-          <span className="unit">2010 — {new Date(END).getUTCFullYear()}</span>
+    <article
+      className="metric-card row-span-6 mb-4 grid min-w-0 scroll-mt-5 grid-cols-1 grid-rows-subgrid gap-y-0 overflow-hidden rounded-xl border border-t-4 border-border border-t-text-muted bg-surface px-4.5 pt-5.25 even:border-t-accent nth-[4n+3]:border-t-ochre md:mb-5 md:px-6.25 md:pt-6.25"
+      id={group.id}
+    >
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <span className="rounded-sm border border-ochre bg-ochre px-2 py-0.75 text-[10px] font-semibold text-text">
+            2010 — {new Date(END).getUTCFullYear()}
+          </span>
         </div>
-        <h2>{group.title}</h2>
-        <p className="subtitle">
+        <h2 className="font-display text-[22px] font-[550] tracking-[-0.6px]">{group.title}</h2>
+        <p className="mt-1 text-[12px] text-text-muted">
           {group.units.length > 1
             ? "Různé jednotky mají samostatné osy. Výšky křivek nelze přímo porovnávat."
             : group.subtitle}
         </p>
       </div>
-      <div className="series-readings">
+      <div className="series-readings my-5.5 grid grid-cols-2 content-start gap-3">
         {series.map((s, i) => {
           const latest = s.points.at(-1);
           return (
-            <div key={s.title}>
-              <span>
+            <div
+              key={s.title}
+              className="group flex min-w-0 flex-col gap-1.75 rounded-lg border border-t-3 border-sage border-t-text-muted bg-sage/28 p-2.75 even:border-accent/35 even:border-t-accent even:bg-accent/10 md:p-3.5"
+            >
+              <span className="flex items-center gap-1.5 text-[11px]">
                 <svg width="30" height="10" aria-hidden="true">
                   <line
                     x1="0"
@@ -234,23 +241,30 @@ function ComparisonCard({
                 </svg>
                 {s.title}
               </span>
-              <strong>
+              <strong className="font-display text-[21px] font-medium tracking-[-0.8px] tabular-nums group-even:text-accent md:text-[25px]">
                 {latest
                   ? format(latest.value, s.id === "interest" ? 2 : s.unit === "%" ? 1 : 0)
                   : "—"}{" "}
-                <small>{s.unit}</small>
+                <small className="font-sans text-[10px] font-normal tracking-normal text-text-muted">
+                  {s.unit}
+                </small>
               </strong>
-              <small>{latest?.period ?? "Čekáme na zdroj dat"}</small>
+              <small className="text-[10px] text-text-muted">
+                {latest?.period ?? "Čekáme na zdroj dat"}
+              </small>
             </div>
           );
         })}
       </div>
-      <div className="legend" aria-label="Legenda ukazatelů">
+      <div
+        className="legend mb-3 flex min-h-7.5 flex-wrap gap-x-4 gap-y-2 text-[10px]"
+        aria-label="Legenda ukazatelů"
+      >
         {series.map((s, i) => (
           <button
             key={s.title}
             aria-pressed={!hiddenSeries.includes(s.id)}
-            className={hiddenSeries.includes(s.id) ? "faded" : ""}
+            className={`flex items-center gap-1.5 ${hiddenSeries.includes(s.id) ? "opacity-25" : ""}`}
             onClick={() =>
               setHiddenSeries((previous) =>
                 previous.includes(s.id)
@@ -274,10 +288,10 @@ function ComparisonCard({
           </button>
         ))}
       </div>
-      <div className="card-chart">
+      <div>
         {chartData.length > 0 && (
           <div
-            className="chart"
+            className="chart -mx-1.25"
             role="img"
             aria-label={`${group.title}, od 1. ledna 2010 do ${date(END)}`}
           >
@@ -341,7 +355,7 @@ function ComparisonCard({
                     const time = Number(label);
                     const term = premiers.findLastIndex((p) => p.time <= time);
                     return (
-                      <div className="chart-tooltip">
+                      <div className="rounded-lg border border-t-3 border-sage border-t-ochre bg-surface p-2.5 text-[11px] leading-[1.8]">
                         <strong>{date(time)}</strong>
                         <p>
                           {premiers[term]?.name} · {premiers[term]?.party}
@@ -394,11 +408,20 @@ function ComparisonCard({
         )}
         {group.ids.map((id) =>
           errors[id] ? (
-            <div className="source-error" role="status" key={id}>
+            <div
+              className="flex flex-col items-start gap-2.5 py-3 text-[11px] text-text-muted md:flex-row md:items-center"
+              role="status"
+              key={id}
+            >
               <span>
                 {metrics.find((m) => m.id === id)!.title}: Data se nepodařilo načíst. {errors[id]}
               </span>
-              <button onClick={() => retry(id)}>Zkusit znovu ↻</button>
+              <button
+                className="shrink-0 rounded-md border border-border bg-surface px-3 py-1.75"
+                onClick={() => retry(id)}
+              >
+                Zkusit znovu ↻
+              </button>
             </div>
           ) : (
             !results[id] && (
@@ -410,23 +433,25 @@ function ComparisonCard({
           ),
         )}
       </div>
-      <div className="card-notes">
-        <details>
-          <summary>Co přesně graf ukazuje</summary>
+      <div>
+        <details className="border-t border-border-subtle py-3 text-[11px] text-text-muted [&_p]:pt-2 [&_p]:leading-[1.7]">
+          <summary className="cursor-pointer">Co přesně graf ukazuje</summary>
           {group.ids.map((id) => {
             const result = results[id];
             const metadata = result?.metadata;
             return (
               <section key={id} className="source-metadata">
-                <h3>{metrics.find((m) => m.id === id)!.title}</h3>
+                <h3 className="mt-3 text-[12px] font-bold">
+                  {metrics.find((m) => m.id === id)!.title}
+                </h3>
                 {metadata ? (
                   <>
                     {metadata.label && <p>{metadata.label}</p>}
-                    <dl>
+                    <dl className="my-2">
                       {metadata.fields.map((field, i) => (
-                        <div key={i}>
-                          <dt>{field.label}</dt>
-                          <dd>{field.value}</dd>
+                        <div key={i} className="mt-1.5">
+                          <dt className="font-semibold">{field.label}</dt>
+                          <dd className="wrap-anywhere">{field.value}</dd>
                         </div>
                       ))}
                     </dl>
@@ -447,26 +472,26 @@ function ComparisonCard({
           })}
         </details>
         {group.ids.includes("gdp") && (
-          <p className="calculation-note">
+          <p className="pb-3 text-[10px] text-text-muted">
             Vlastní výpočet aplikace: růst HDP = objemový index ČSÚ − 100.
           </p>
         )}
         {group.ids.includes("gdpAbsolute") && (
-          <p className="calculation-note">
+          <p className="pb-3 text-[10px] text-text-muted">
             Vlastní výpočet aplikace: HDP v mld. Kč = součet údajů ČSÚ za poslední 4 čtvrtletí v
             mil. Kč ÷ 1 000.
           </p>
         )}
       </div>
-      <footer className="card-footer">
+      <footer className="card-footer -mx-4.5 border-t border-sage bg-sage/20 px-4.5 py-3 text-[10px] text-text-muted md:-mx-6.25 md:px-6.25 md:py-3.25 [&_a]:underline-offset-3">
         {group.ids.map((id) => (
-          <div key={id}>
+          <div key={id} className="flex flex-wrap items-center gap-1 not-first:mt-2">
             Dostupné na: {metrics.find((m) => m.id === id)!.source} ·{" "}
             <a href={sourcePages[id]} target="_blank" rel="noreferrer">
               {metrics.find((m) => m.id === id)!.title} ↗
             </a>
             <DataFormatLinks id={id} />
-            <span>
+            <span className="w-full text-[9px] md:ml-auto md:w-auto">
               {results[id]
                 ? `Staženo ze zdroje: ${new Date(results[id]!.loaded).toLocaleString("cs-CZ")}`
                 : "Zatím bez platného načtení"}
@@ -522,19 +547,33 @@ function App() {
   );
   return (
     <>
-      <main>
-        <section className="intro">
-          <h1>KPIčka</h1>
-          <p className="intro-quote">
+      <main className="mx-auto max-w-[1272px] px-4 md:px-6">
+        <section className="grid grid-cols-[minmax(0,1fr)_96px] items-center gap-x-4 pt-9.5 pb-6 md:grid-cols-[minmax(0,1fr)_auto] md:gap-x-10 md:pt-15.5 md:pb-8.75">
+          <h1 className="col-1 mt-4 mb-4.5 font-display text-[length:clamp(36px,4.7vw,62px)] leading-[1.15] font-[550] tracking-[-1.6px] after:mt-2.5 after:block after:h-1.5 after:w-18 after:rounded-[3px] after:bg-ochre md:tracking-[-2.7px]">
+            KPIčka
+          </h1>
+          <p className="col-1 mb-5 max-w-[680px] border-l-3 border-ochre py-1.5 pl-4.5 font-[Georgia,serif] text-[length:clamp(19px,2.3vw,25px)] leading-[1.6] text-accent italic">
             „Ono se to nějak vyvrbí. Ještě nikdy nebylo, aby nějak nebylo.“ - Dobrý voják Švejk
           </p>
-          <p>Prohlédněte si vývoj české ekonomiky v kontextu jednotlivých vlád.</p>
-          <img className="intro-art" src={svejk} alt="" width={560} height={613} />
+          <p className="col-1 text-[14px] leading-[1.8] text-text-muted md:text-[16px]">
+            Prohlédněte si vývoj české ekonomiky v kontextu jednotlivých vlád.
+          </p>
+          <img
+            className="col-2 row-1 h-auto w-24 md:row-[1/span_3] md:w-[clamp(180px,22vw,280px)]"
+            src={svejk}
+            alt=""
+            width={560}
+            height={613}
+          />
         </section>
-        <section className="filters" aria-label="Filtry vlád a politických stran">
-          <div className="filter-heading">
-            <h2>Vlády v čase</h2>
+        <section
+          className="mb-6 rounded-xl border border-sage bg-sage/35 px-3 py-4.5 md:p-6"
+          aria-label="Filtry vlád a politických stran"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-display text-[18px] font-[550]">Vlády v čase</h2>
             <button
+              className="rounded-md border border-text-muted bg-text-muted px-3 py-1.75 text-[11px] text-surface hover:border-ochre hover:bg-ochre hover:text-text"
               onClick={() => {
                 setExcludedTerms([]);
                 setExcludedParties([]);
@@ -543,19 +582,19 @@ function App() {
               Zobrazit vše ↻
             </button>
           </div>
-          <p>
+          <p className="mt-2 mb-4 text-[12px] leading-[1.7] text-text-muted">
             Kliknutím na období nebo stranu ztlumíte odpovídající části všech grafů. Časová osa
             zůstává stejná.
           </p>
-          <div className="timeline-scroll">
-            <div className="premier-strip">
+          <div className="overflow-x-auto pt-2 pb-2.5">
+            <div className="premier-strip relative mx-7.5 h-37.5 min-w-240">
               {premiers.map((p, i) => {
                 const start = Math.max(START, p.time),
                   end = premiers[i + 1]?.time ?? END;
                 return (
                   <button
                     key={p.start}
-                    className={active[i] ? "" : "faded"}
+                    className={`absolute top-0 flex h-28.75 flex-col items-center justify-start gap-1 border-b-4 px-0.5 text-[10px] transition-opacity duration-150 ${active[i] ? "" : "faded opacity-25"}`}
                     aria-pressed={!excludedTerms.includes(p.start)}
                     aria-label={`${p.name} · ${p.party} · ${date(start)} – ${date(end)}`}
                     title={`${p.name} · ${p.party} · vláda od ${date(p.time)} do ${date(end)}`}
@@ -566,28 +605,40 @@ function App() {
                     }}
                     onClick={() => toggleTerm(p.start)}
                   >
-                    <img src={p.image} alt={p.name} style={{ borderColor: partyColors[p.party] }} />
-                    <span>{p.name}</span>
-                    <small>{p.party}</small>
+                    <img
+                      className="size-11.5 rounded-[10px] border-3 object-cover object-[center_20%] ring-1 ring-border"
+                      src={p.image}
+                      alt={p.name}
+                      style={{ borderColor: partyColors[p.party] }}
+                    />
+                    <span className="font-display">{p.name}</span>
+                    <small className="text-[9px]">{p.party}</small>
                   </button>
                 );
               })}
-              <div className="timeline-years">
+              <div className="absolute top-31.25 w-full text-[10px] text-text-muted">
                 {ticks.map((time) => (
-                  <span key={time} style={{ left: `${((time - START) / (END - START)) * 100}%` }}>
+                  <span
+                    key={time}
+                    className="absolute -translate-x-1/2"
+                    style={{ left: `${((time - START) / (END - START)) * 100}%` }}
+                  >
                     {new Date(time).getUTCFullYear()}
                   </span>
                 ))}
               </div>
             </div>
           </div>
-          <div className="party-filters" aria-label="Politické strany">
-            <strong>Strany premiérů</strong>
+          <div
+            className="mt-3.5 flex flex-wrap items-center gap-2.5 text-[12px]"
+            aria-label="Politické strany"
+          >
+            <strong className="mr-2 font-medium">Strany premiérů</strong>
             {(Object.keys(partyColors) as Party[]).map((party) => (
               <button
                 key={party}
                 aria-pressed={!excludedParties.includes(party)}
-                className={excludedParties.includes(party) ? "faded" : ""}
+                className={`flex items-center gap-1.75 rounded-md border border-border bg-surface px-3 py-1.75 aria-pressed:border-text-muted aria-pressed:bg-surface/75 ${excludedParties.includes(party) ? "opacity-25" : ""}`}
                 onClick={() =>
                   setExcludedParties((previous) =>
                     previous.includes(party)
@@ -596,29 +647,43 @@ function App() {
                   )
                 }
               >
-                <i style={{ background: partyColors[party] }} />
+                <i className="size-2.5 rounded-full" style={{ background: partyColors[party] }} />
                 {party}
               </button>
             ))}
           </div>
-          <p className="filter-note">
+          <p className="mt-3.5 text-[10px] leading-[1.7] text-text-muted">
             Období vymezujeme nástupem vlád do funkce, nikoli datem voleb. Nestr. = nestranický
             premiér úřednické vlády. Filtry se kombinují; zvýrazněná jsou období povolená oběma
             filtry.
           </p>
         </section>
-        <nav className="metric-nav" aria-label="Ukazatele">
+        <nav
+          className="flex flex-wrap gap-1.5 border-y border-border py-3.5 md:gap-2 md:py-4.5"
+          aria-label="Ukazatele"
+        >
           {groups.map((g) => (
-            <a key={g.id} href={`#${g.id}`}>
+            <a
+              key={g.id}
+              href={`#${g.id}`}
+              className="rounded-md border border-text bg-text px-2.25 py-1.5 text-[11px] text-surface no-underline hover:border-ochre hover:bg-ochre hover:text-text md:px-3.25 md:py-1.75 md:text-[12px]"
+            >
               {g.title}
             </a>
           ))}
         </nav>
-        <div className="section-heading">
-          <h2>Přehled ukazatelů</h2>
-          <span>ČSÚ · MF ČR · ČSSZ · ČNB</span>
+        <div className="mt-7.75 mb-4.5 flex items-center justify-between">
+          <h2 className="font-display text-[18px] font-[550] tracking-[-0.4px]">
+            Přehled ukazatelů
+          </h2>
+          <span className="text-[9px] tracking-[1px] text-text-muted md:text-[10px]">
+            ČSÚ · MF ČR · ČSSZ · ČNB
+          </span>
         </div>
-        <section className="dashboard" aria-label="Ekonomické ukazatele">
+        <section
+          className="grid grid-cols-1 md:grid-cols-2 md:gap-x-5"
+          aria-label="Ekonomické ukazatele"
+        >
           {groups.map((group) => (
             <ComparisonCard
               key={group.id}
@@ -634,8 +699,13 @@ function App() {
             />
           ))}
         </section>
-        <section className="about" id="zdroje">
-          <h2>Veřejná data. Otevřený kontext.</h2>
+        <section
+          className="max-w-185 py-8.5 before:mb-4.5 before:block before:h-1 before:w-12 before:rounded-xs before:bg-ochre md:pt-13 md:pb-11.5 [&_p]:mt-2.5 [&_p]:text-[12px] [&_p]:leading-[1.9] [&_p]:text-text-muted"
+          id="zdroje"
+        >
+          <h2 className="mb-3.25 font-display text-[22px] font-normal tracking-[-0.6px]">
+            Veřejná data. Otevřený kontext.
+          </h2>
           <p>
             Data ČSÚ a ČSSZ načítáme přímo ze zdroje při otevření stránky. Ostatní zdroje a záložní
             kopii pro případ výpadku stahujeme jednou denně do vlastní cache. U každého ukazatele
@@ -656,8 +726,10 @@ function App() {
           </p>
         </section>
       </main>
-      <footer className="site-footer">
-        <strong>Česko v číslech</strong>
+      <footer className="border-t-4 border-ochre bg-text px-4 py-6 text-[11px] text-sage md:px-[max(24px,calc((100%_-_1224px)/2))] md:pt-7.5 md:pb-9.5 [&_a]:underline-offset-3 [&_p]:mt-1.25">
+        <strong className="mb-3.5 block font-display text-[14px] font-normal text-ochre">
+          Česko v číslech
+        </strong>
         <p>
           Zdroj dat: Český statistický úřad (ČSÚ), Ministerstvo financí ČR, Česká správa sociálního
           zabezpečení a Česká národní banka (ČNB).
