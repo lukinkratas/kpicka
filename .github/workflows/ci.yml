@@ -11,12 +11,14 @@ permissions:
   contents: read
 
 jobs:
-  test-dev:
+  fmt-lint-check:
+    runs-on: ubuntu-latest
+    name: Format and Lint check
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
